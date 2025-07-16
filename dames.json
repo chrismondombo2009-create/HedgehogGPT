@@ -1,9 +1,32 @@
-const fs = require('fs');
-
-function saveGames() {
-  fs.writeFileSync('damier.json', JSON.stringify(damierGames, null, 2));
-}
-
-function saveStats() {
-  fs.writeFileSync('damierStats.json', JSON.stringify(damierStats, null, 2));
+{
+  "games": [
+    {
+      "players": ["𝙹𝚎𝚊𝚗", "𝙿𝚊𝚞𝚕"],
+      "board": [
+        ["🟩","⚫","🟩","⚫","🟩","⚫","🟩","⚫"],
+        ["⚫","🟩","⚫","🟩","⚫","🟩","⚫","🟩"],
+        ["🟩","⚫","🟩","⚫","🟩","⚫","🟩","⚫"],
+        ["🟩","🟩","🟩","🟩","🟩","🟩","🟩","🟩"],
+        ["🟩","🟩","🟩","🟩","🟩","🟩","🟩","🟩"],
+        ["⚪","🟩","⚪","🟩","⚪","🟩","⚪","🟩"],
+        ["🟩","⚪","🟩","⚪","🟩","⚪","🟩","⚪"],
+        ["⚪","🟩","⚪","🟩","⚪","🟩","⚪","🟩"]
+      ],
+      "moves": [
+        "b6 a5",
+        "g3 h4"
+      ],
+      "status": "inProgress"
+    },
+    {
+      "players": ["𝚁𝚎𝚗𝚎́", "BOT"],
+      "board": [],
+      "moves": [
+        "c6 d5",
+        "e3 f4"
+      ],
+      "status": "finished",
+      "winner": "𝚁𝚎𝚗𝚎́"
+    }
+  ]
 }
