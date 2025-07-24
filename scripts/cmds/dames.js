@@ -1,4 +1,3 @@
-~cmd install dames.js
 const fetch = require('node-fetch');
 
 const damierGames = {};
