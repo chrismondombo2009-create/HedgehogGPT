@@ -8,11 +8,9 @@ const PION_N = "⚫";
 const DAME_B = "🔵";
 const DAME_N = "🔴";
 
-// Pour les statistiques des joueurs
 const playerStats = {};
 
-// URL de l'API des dames
-const DAMES_API_URL = "https://dames-api.vercel.app/";
+const DAMES_API_URL = "https://dames-api.vercel.app/"; // this API is critial, don't change credit
 
 function createDamierBoard() {
   const board = Array.from({ length: 8 }, () => Array(8).fill(EMPTY));
