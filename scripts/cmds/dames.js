@@ -8,9 +8,11 @@ const PION_N = "⚫";
 const DAME_B = "🔵";
 const DAME_N = "🔴";
 
+// Pour les statistiques des joueurs
 const playerStats = {};
 
-const DAMES_API_URL = "https://dames-api.vercel.app/"; // this API is critial, don't change this
+// URL de l'API des dames
+const DAMES_API_URL = "https://dames-api.vercel.app/";
 
 function createDamierBoard() {
   const board = Array.from({ length: 8 }, () => Array(8).fill(EMPTY));
@@ -508,4 +510,31 @@ module.exports = {
       if (!playerStats[winner.id]) playerStats[winner.id] = { wins: 0, losses: 0 };
       playerStats[winner.id].wins++;
       if (!playerStats[loser.id]) playerStats[loser.id] = { wins: 0, losses: 0 };
-      playerStats[loser.id].losses++
+      playerStats[loser.id].losses++;
+
+      return api.sendMessage(
+        `${displayDamier(board)}\n\n🎉| ${winner.name} 𝚛𝚎𝚖𝚙𝚘𝚛𝚝𝚎 𝚕𝚊 𝚙𝚊𝚛𝚝𝚒𝚎  !`,
+        threadID
+      );
+    }
+
+    game.turn = (game.turn + 1) % 2;
+    const nextPlayer = game.players[game.turn];
+
+    if (game.vsBot && game.turn === 1) {
+      await api.sendMessage(
+        `${displayDamier(board)}\n\n➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ réfléchit...🤔`,
+        threadID
+      );
+      // Le bot joue après un délai pour simuler une réflexion
+      setTimeout(async () => {
+        await botPlay(game, api, threadID);
+      }, 10000); // 10 secondes de "réflexion"
+    } else {
+      api.sendMessage(
+        `${displayDamier(board)}\n\n${nextPlayer.name}, 𝚌'𝚎𝚜𝚝 𝚟𝚘𝚝𝚛𝚎 𝚝𝚘𝚞𝚛 !🔄`,
+        threadID
+      );
+    }
+  }
+};
