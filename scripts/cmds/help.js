@@ -1,8 +1,7 @@
 const { getPrefix } = global.utils;
 const { commands, aliases } = global.GoatBot;
 
-// Font function
- (𝐚, 𝐛, 𝐜, 𝐀, 𝐁, 𝐂, ...)
+// Fonction pour transformer un texte en police Bold Serif Unicode (𝐚, 𝐛, 𝐜, 𝐀, 𝐁, 𝐂, ...)
 function toBoldSerifFont(text) {
   return text.split('').map(char => {
     // minuscules
@@ -20,7 +19,7 @@ function toBoldSerifFont(text) {
 module.exports = {
   config: {
     name: "help",
-    version: "1.1",
+    version: "1.18",
     author: "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝐗𝐄 3.0★彡",
     countDown: 5,
     shortDescription: {
@@ -37,6 +36,8 @@ module.exports = {
   },
 
   onStart: async function ({ message, args, event, threadsData }) {
+ 
+
     const { threadID } = event;
     const prefix = getPrefix(threadID);
     const language = "en";
