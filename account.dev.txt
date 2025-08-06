@@ -16,7 +16,7 @@
     },
     {
         "name": "fr",
-        "value": "0akrWJXCkojVNOPQH.AWew3VyqH8x2QYK66qBzby9qVuc974GxONRX9A-C3L5epRZRVRI.BoksKy..AAA.0.0.Boku4Y.AWfMWzAuxxk9-OOKvLt7X2F1zxk",
+        "value": "1RHMF0WE0kujQfv4H.AWcuoervVrrK1as04NYCCUkcxGz9KRfWa5_5_3ip9GKlgHs7Lks.Bokvwl..AAA.0.0.Bokvwl.AWcelYocGnhYygThi3FT8t77ZAU",
         "domain": ".facebook.com",
         "hostOnly": false,
         "path": "/",
@@ -26,12 +26,12 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1762235673,
+        "expirationDate": 1762239269,
         "storeId": null
     },
     {
         "name": "xs",
-        "value": "35%3ANjttoY4-soxA5w%3A2%3A1754459669%3A-1%3A-1",
+        "value": "35%3ANjttoY4-soxA5w%3A2%3A1754459669%3A-1%3A-1%3A%3AAcXGcDanIM-O_crY-CEpq85toR1A4eNZDLVSNMLi1A",
         "domain": ".facebook.com",
         "hostOnly": false,
         "path": "/",
@@ -41,7 +41,7 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1785995671,
+        "expirationDate": 1785999269,
         "storeId": null
     },
     {
@@ -56,12 +56,12 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1785995671,
+        "expirationDate": 1785999269,
         "storeId": null
     },
     {
         "name": "presence",
-        "value": "C%7B%22t3%22%3A%5B%5D%2C%22utc3%22%3A1754459685363%2C%22v%22%3A1%7D",
+        "value": "C%7B%22lm3%22%3A%22g.8863528460348629%22%2C%22t3%22%3A%5B%5D%2C%22utc3%22%3A1754465774190%2C%22v%22%3A1%7D",
         "domain": ".facebook.com",
         "hostOnly": false,
         "path": "/",
@@ -100,22 +100,7 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1755064499,
-        "storeId": null
-    },
-    {
-        "name": "dbln",
-        "value": "%7B%2261579341020538%22%3A%22q6AMFlcW%22%7D",
-        "domain": ".facebook.com",
-        "hostOnly": false,
-        "path": "/login/device-based/",
-        "secure": true,
-        "httpOnly": true,
-        "sameSite": "no_restriction",
-        "session": false,
-        "firstPartyDomain": "",
-        "partitionKey": null,
-        "expirationDate": 1762235708,
+        "expirationDate": 1755064878,
         "storeId": null
     }
 ]
