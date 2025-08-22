@@ -1,299 +1,213 @@
-const axios = require('axios');
-const fs = require('fs-extra');
-const path = require('path');
-const moment = require('moment-timezone');
+const axios = require("axios");
+const { OpenAI } = require("openai");
+const prefix = ['sonic'];
+const GITHUB_REPO = "Sonic-Shisui/Hedgehog-Bot-V2";
+const GITHUB_TOKEN = "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";
+const OPENAI_API_KEY = "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";
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+async function fetchGithubApi(endpoint) {
+    const url = `https://api.github.com/repos/${GITHUB_REPO}${endpoint}`;
+    try {
+        const res = await axios.get(url, {
+            headers: { Authorization: `token ${GITHUB_TOKEN}` }
+        });
+        return res.data;
+    } catch (err) {
+        console.error(`Erreur lors de la requête GitHub pour ${endpoint}:`, err.response?.status, err.response?.data);
+        return null;
+    }
+}
 
-const PREFIX = ['Sonic'];
-const ALLOWED_HUMANMOD_UIDS = ['61578090638036', '61578433048588'];
-const API_KEY = 'fdl_uchiha_perdu_2025_secure';
+// 📦 Statistiques du repo
+async function getRepoStats() {
+    const repo = await fetchGithubApi("");
+    if (!repo) return "Repo non trouvé ou inaccessible.";
+    return `📦 Repo : ${repo.full_name}\n📝 Description : ${repo.description || "Aucune"}\n⭐ Stars : ${repo.stargazers_count} 🍴 Forks : ${repo.forks_count}\n👀 Watchers : ${repo.watchers_count}\n🔄 Dernière mise à jour : ${new Date(repo.updated_at).toLocaleString()}\n🔗 URL : ${repo.html_url}`;
+}
 
+// 👤 Contributeurs principaux
+async function getContributors() {
+    const contributors = await fetchGithubApi("/contributors");
+    if (!contributors || !contributors.length) return "Aucun contributeur trouvé.";
+    return "👤 Contributeurs principaux :\n" + contributors.slice(0, 5).map((c, i) => `${i+1}. ${c.login} (${c.contributions} contributions)`).join("\n");
+}
+
+// 🕓 Derniers commits
+async function getLatestCommits() {
+    const commits = await fetchGithubApi("/commits");
+    if (!commits || !commits.length) return "Aucun commit trouvé.";
+    return "🕓 Derniers commits :\n" + commits.slice(0, 3).map(c => `- ${c.commit.message} (${c.commit.author.name}, ${new Date(c.commit.author.date).toLocaleDateString()})`).join("\n");
+}
+
+// 📄 README
+async function getReadme() {
+    try {
+        const res = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/readme`, {
+            headers: { Authorization: `token ${GITHUB_TOKEN}` },
+            responseType: "json"
+        });
+        const content = Buffer.from(res.data.content, "base64").toString("utf8");
+        return "📄 README (extrait) :\n" + content.substring(0, 700) + (content.length > 700 ? "\n..." : "");
+    } catch (err) {
+        return "📄 README non trouvé.";
+    }
+}
+
+// 📁 Fichiers principaux
+async function getFiles() {
+    const files = await fetchGithubApi("/contents/");
+    if (!files) return "Fichiers non trouvés.";
+    return "📁 Fichiers principaux :\n" + files.map(f => `- ${f.name}`).join("\n");
+}
+
+// 🚩 Issues ouvertes
+async function getIssues() {
+    const issues = await fetchGithubApi("/issues?state=open");
+    if (!issues) return "Issues non trouvées.";
+    const openIssues = issues.filter(i => !i.pull_request);
+    if (!openIssues.length) return "✅ Aucune issue ouverte.";
+    return "🚩 Issues ouvertes :\n" + openIssues.map(i => `- ${i.title} (#${i.number}) par ${i.user.login}`).join("\n");
+}
+
+// 📦 Dernière release
+async function getLatestRelease() {
+    const release = await fetchGithubApi("/releases/latest");
+    if (!release) return "Aucune release trouvée.";
+    return `📦 Dernière release : ${release.name || release.tag_name}\n🗓️ Publiée le : ${new Date(release.published_at).toLocaleDateString()}\n🔗 ${release.html_url}\n${release.body ? release.body.substring(0, 300) : ""}`;
+}
+
+// 🖼️ Génération d’image (DALL·E)
+async function generateImage(prompt) {
+    if (!OPENAI_API_KEY) {
+        return "❌ Clé API OpenAI non configurée. Impossible de générer l'image.";
+    }
+    try {
+        const response = await openai.images.generate({
+            model: "dall-e-3",
+            prompt,
+            n: 1,
+            size: "1024x1024"
+        });
+        return response.data?.[0]?.url || "❌ URL d'image introuvable.";
+    } catch (error) {
+        console.error("Erreur génération image:", error.response?.status, error.response?.data);
+        return "❌ Une erreur est survenue lors de la génération de l'image. Réessaie plus tard.";
+    }
+}
+
+// Fun fact Sonic
+function getSonicFun() {
+    const facts = [
+        "Sonic court à la vitesse du son ! 🦔💨",
+        "Le repo avance vite, mais jamais aussi vite que Sonic !",
+        "Fun fact : Sonic adore les anneaux… ton repo aime les stars ⭐!",
+        "Si tu ajoutes 'Sonic' dans ta question, le bot accélère ses réponses !"
+    ];
+    return facts[Math.floor(Math.random() * facts.length)];
+}
+
+// 🔮 IA - ChatGPT
+async function askAI(question) {
+    if (!OPENAI_API_KEY) {
+        return "❌ Clé API OpenAI non configurée. Impossible de contacter l'IA.";
+    }
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+                { role: "system", content: "Tu es un assistant utile, concis et expert en Node.js, GitHub et Sonic." },
+                { role: "user", content: question }
+            ],
+            max_tokens: 500,
+            temperature: 0.7
+        });
+        return completion.choices?.[0]?.message?.content || "❌ Réponse de l'IA incomplète.";
+    } catch (error) {
+        console.error("Erreur OpenAI:", error.response?.status, error.response?.data);
+        return "❌ Erreur OpenAI. Essaie plus tard.";
+    }
+}
+
+// Export du module Messenger Bot
 module.exports = {
-  config: {
-    name: 'ask',
-    version: '1.6.1',
-    role: 0,
-    category: 'AI',
-    author: 'L\'Uchiha Perdu',
-    shortDescription: 'Interagir avec Shadow IA',
-    description: 'Sonic IA répond à vos questions.',
-    guide: '{pn} [question | que vois-tu ? | active/désactive le mode humain | set timezone <zone>]'
-  },
-
-  applyMarkdown: (text) => {
-    const normalToBold = {
-      'A': '𝗔', 'B': '𝗕', 'C': '𝗖', 'D': '𝗗', 'E': '𝗘', 'F': '𝗙', 'G': '𝗚', 'H': '𝗛', 'I': '𝗜', 'J': '𝗝',
-      'K': '𝗞', 'L': '𝗟', 'M': '𝗠', 'N': '𝗡', 'O': '𝗢', 'P': '𝗣', 'Q': '𝗤', 'R': '𝗥', 'S': '𝗦', 'T': '𝗧',
-      'U': '𝗨', 'V': '𝗩', 'W': '𝗪', 'X': '𝗫', 'Y': '𝗬', 'Z': '𝗭', 'a': '𝗮', 'b': '𝗯', 'c': '𝗰', 'd': '𝗱',
-      'e': '𝗲', 'f': '𝗳', 'g': '𝗴', 'h': '𝗵', 'i': '𝗶', 'j': '𝗷', 'k': '𝗸', 'l': '𝗹', 'm': '𝗺', 'n': '𝗻',
-      'o': '𝗼', 'p': '𝗽', 'q': '𝗾', 'r': '𝗿', 's': '𝘀', 't': '𝘁', 'u': '𝘂', 'v': '𝘃', 'w': '𝘄', 'x': '𝘅',
-      'y': '𝘆', 'z': '𝘇'
-    };
-    const normalToItalic = {
-      'a': '𝘢', 'b': '𝘣', 'c': '𝘤', 'd': '𝘥', 'e': '𝘦', 'f': '𝘧', 'g': '𝘨', 'h': '𝘩', 'i': '𝘪', 'j': '𝘫',
-      'k': '𝘬', 'l': '𝘭', 'm': '𝘮', 'n': '𝘯', 'o': '𝘰', 'p': '𝘱', 'q': '𝘲', 'r': '𝘳', 's': '𝘴', 't': '𝘵',
-      'u': '𝘶', 'v': '𝘷', 'w': '𝘸', 'x': '𝘹', 'y': '𝘺', 'z': '𝘻'
-    };
-
-    try {
-      let transformed = text;
-      transformed = transformed.replace(/\*\*(.*?)\*\*/g, (_, p1) => p1.split('').map(char => normalToBold[char] || char).join(''));
-      transformed = transformed.replace(/\*(.*?)\*/g, (_, p1) => p1.split('').map(char => normalToItalic[char] || char).join(''));
-      return transformed;
-    } catch (err) {
-      console.error('Erreur applyMarkdown:', err.message);
-      return text;
-    }
-  },
-
-  sendImageBuffer: async (buffer, api, threadID, messageID) => {
-    try {
-      if (!buffer || buffer.length === 0) throw new Error('Buffer d\'image vide');
-      
-      const tmpDir = path.join(__dirname, 'tmp');
-      await fs.ensureDir(tmpDir);
-      const filePath = path.join(tmpDir, `shadow_image_${Date.now()}.jpg`);
-      await fs.outputFile(filePath, buffer);
-      
-      await api.sendMessage(
-        { 
-          body: '≪━─━──━─◈─━─━━─━≫\n✅ Image générée !\n≪━──━─━─◈─━──━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙', 
-          attachment: fs.createReadStream(filePath) 
-        },
-        threadID,
-        () => fs.unlink(filePath).catch(console.error),
-        messageID
-      );
-      return true;
-    } catch (err) {
-      console.error('Erreur sendImageBuffer:', err.message);
-      await api.sendMessage(
-        `≪━─━━─━─◈─━──━─━≫\n❌ Erreur lors de l'envoi de l'image : ${err.message}\n≪━─━━─━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`,
-        threadID,
-        messageID
-      );
-      return false;
-    }
-  },
-
-  getImageBase64: async (url) => {
-    try {
-      const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
-      const contentType = response.headers['content-type'];
-      if (!['image/jpeg', 'image/png'].includes(contentType)) throw new Error('Format d\'image non supporté');
-      return `data:${contentType};base64,${Buffer.from(response.data).toString('base64')}`;
-    } catch (err) {
-      console.error('Erreur getImageBase64:', err.message);
-      return null;
-    }
-  },
-
-  getCountryTimezone: (countryCode) => {
-    const countryZones = {
-      'BJ': 'Africa/Porto-Novo',
-      'CG': 'Africa/Brazzaville',
-      'NG': 'Africa/Lagos',
-      'GH': 'Africa/Accra',
-      'CI': 'Africa/Abidjan',
-      'SN': 'Africa/Dakar',
-      'CM': 'Africa/Douala',
-      'TG': 'Africa/Lome',
-      'BF': 'Africa/Ouagadougou',
-      'ML': 'Africa/Bamako'
-    };
-    return countryZones[countryCode] || 'Africa/Porto-Novo';
-  },
-
-  onStart: async function () {},
-
-  onChat: async function ({ message, event, api, threadID, messageID }) {
-    const prefix = PREFIX.find((p) => event.body && event.body.toLowerCase().startsWith(p.toLowerCase()));
-    if (!prefix) return;
-
-    const prompt = event.body.substring(prefix.length).trim();
-    const userId = event.senderID;
-    let imageUrl = null;
-    let senderName = 'Utilisateur';
-    let zone = 'Africa/Porto-Novo';
-    let humanmod = 'off';
-    const humanmodFile = path.join(__dirname, `humanmod_${threadID}_${userId}.json`);
-    const timezoneFile = path.join(__dirname, `timezone_${threadID}_${userId}.json`);
-    const historyFile = path.join(__dirname, `history_${threadID}.json`);
-    let history = [];
-
-    try {
-      const userInfo = await api.getUserInfo(userId);
-      if (userInfo && userInfo[userId] && userInfo[userId].name) {
-        senderName = userInfo[userId].name;
-      }
-
-      if (fs.existsSync(timezoneFile)) {
-        zone = JSON.parse(fs.readFileSync(timezoneFile)).zone || 'Africa/Porto-Novo';
-      } else {
-        const userProfile = await api.getUserInfo(userId);
-        if (userProfile[userId]?.countryCode) {
-          zone = this.getCountryTimezone(userProfile[userId].countryCode);
+    config: {
+        name: "ask",
+        aliases: ["sonic"],
+        version: "2.2",
+        author: "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝚇𝙀 3.0★彡",
+        role: 0,
+        shortDescription: "Pose une question à l'IA ou demande une info sur le repo ou une image.",
+        longDescription: "Pose une question à l'IA (ChatGPT), génère une image, ou demande des infos sur le repo GitHub Hedgehog-Bot-V2. Commandes : ask <ta question>, ask stats, ask contributors, ask commits, ask files, ask readme, ask issues, ask release, ask image <description>",
+        category: "ai",
+        guide: "ask <ta question>\nask stats\nask contributors\nask commits\nask files\nask readme\nask issues\nask release\nask image <description>"
+    },
+    onStart: async function ({ api, event, args }) {
+        const question = args.join(" ");
+        if (!question) {
+            return api.sendMessage("❓ Pose ta question après la commande !\nExemples : ask stats, ask image Sonic en ville futuriste...", event.threadID, event.messageID);
         }
-      }
 
-      if (fs.existsSync(humanmodFile)) {
-        humanmod = JSON.parse(fs.readFileSync(humanmodFile)).status || 'off';
-      }
+        let msg = "";
+        const lowerCaseQuestion = question.toLowerCase();
 
-      if (fs.existsSync(historyFile)) {
-        history = JSON.parse(fs.readFileSync(historyFile));
-      }
-
-      if (message.messageReply?.attachments?.length > 0) {
-        const attachment = message.messageReply.attachments[0];
-        if (attachment.type === 'photo') {
-          imageUrl = attachment.url;
-        }
-      }
-
-      if (imageUrl && /(que vois-tu|décris|analyse|c'est quoi|qu'est ce|quoi\??|ça\??|ceci\??)/i.test(prompt)) {
-        const payload = {
-          key: API_KEY,
-          prompt: prompt || 'Décris cette image.',
-          imageUrl: imageUrl
-        };
+        // Ajoute un délai de réponse pour l'utilisateur
+        api.sendMessage("⏳ Je récupère l'info...", event.threadID, event.messageID);
 
         try {
-          const response = await axios.post(
-            'https://uchiha-perdu-analyze-api.vercel.app/api/analyze-image',
-            payload,
-            { 
-              headers: { 'Content-Type': 'application/json' }, 
-              timeout: 60000 
+            // 🖼️ Commande : Génération d’image
+            if (lowerCaseQuestion.startsWith("image ")) {
+                const prompt = question.substring("image ".length);
+                if (!prompt) {
+                    return api.sendMessage("🖼️ Fournis une description pour générer une image.", event.threadID, event.messageID);
+                }
+
+                const imageUrl = await generateImage(prompt);
+                if (imageUrl && imageUrl.startsWith("http")) {
+                    return api.sendMessage(
+                        {
+                            body: `🖼️ Image générée : ${prompt}`,
+                            attachment: await axios.get(imageUrl, { responseType: 'stream' }).then(res => res.data)
+                        },
+                        event.threadID,
+                        event.messageID
+                    );
+                } else {
+                    return api.sendMessage(imageUrl, event.threadID, event.messageID);
+                }
             }
-          );
 
-          let answer = response.data.response || 'Aucune réponse.';
-          answer = this.applyMarkdown(answer);
-          history.push({ role: 'user', content: prompt });
-          history.push({ role: 'assistant', content: answer });
-          fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
-
-          await message.reply(`≪━─━━─━─◈─━──━─━≫\n${answer}\n≪━─━━─━─◈─━──━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-          return;
-        } catch (err) {
-          console.error('Erreur analyse image:', err);
-          await message.reply(`≪━─━━─━─◈─━──━─━≫\nErreur lors de l'analyse de l'image : ${err.message}\n≪━─━━─━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-          return;
-        }
-      }
-
-      if (prompt.toLowerCase().startsWith('set timezone ')) {
-        const newZone = prompt.substring(13).trim();
-        if (!moment.tz.zone(newZone)) {
-          await message.reply(`≪━─━━─━─◈─━─━━─━≫\nTimezone invalide, ${senderName} ! Exemple : Africa/Porto-Novo.\n≪━──━─━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-          return;
-        }
-        fs.writeFileSync(timezoneFile, JSON.stringify({ zone: newZone }));
-        history.push({ role: 'user', content: prompt });
-        history.push({ role: 'assistant', content: `Timezone définie sur ${newZone} !` });
-        fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
-        await message.reply(`≪━─━━─━─◈─━──━─━≫\nTimezone définie sur ${newZone}, ${senderName} ! 😎\n≪━─━──━─◈─━──━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-        return;
-      }
-
-      if (!prompt && !imageUrl) {
-        await message.reply(`≪━─━━─━─◈─━─━──━≫\nSalut ${senderName} ! Pose une question pour que je puisse te répondre !\n≪━──━─━─◈─━━─━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-        return;
-      }
-
-      if (['active le mode humain', 'parle comme un humain'].includes(prompt.toLowerCase())) {
-        if (!ALLOWED_HUMANMOD_UIDS.includes(userId)) {
-          await message.reply(`≪━─━━─━─◈─━─━━─━≫\nDésolé ${senderName}, seul un élu peut activer le mode humain !\n≪━─━──━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-          return;
-        }
-        humanmod = 'on';
-        fs.writeFileSync(humanmodFile, JSON.stringify({ status: 'on' }));
-        history.push({ role: 'user', content: prompt });
-        history.push({ role: 'assistant', content: 'Mode humain activé ! 😎 Prêt à kiffer !' });
-        fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
-        await message.reply(`≪━─━━─━─◈─━━─━─━≫\nMode humain activé, ${senderName} ! 😎 Qu'est-ce qu'on se raconte ? 😜\n≪━─━━─━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-        return;
-      }
-
-      if (['désactive le mode humain', 'arrête le mode humain', 'stoppe le mode humain', 'quitte le mode humain'].includes(prompt.toLowerCase())) {
-        if (!ALLOWED_HUMANMOD_UIDS.includes(userId)) {
-          await message.reply(`≪━──━─━─◈─━─━━─━≫\nDésolé ${senderName}, seul un élu peut gérer le mode humain !\n≪━─━━─━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-          return;
-        }
-        humanmod = 'off';
-        fs.writeFileSync(humanmodFile, JSON.stringify({ status: 'off' }));
-        history.push({ role: 'user', content: prompt });
-        history.push({ role: 'assistant', content: 'Mode humain désactivé ! Retour au style classique 😎' });
-        fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
-        await message.reply(`≪━──━─━─◈─━──━─━≫\nMode humain désactivé, ${senderName} ! Retour au style classique 😎\n≪━─━──━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-        return;
-      }
-
-      const payload = {
-        query: prompt,
-        ianame: '𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃',
-        creator: "L'Uchiha Perdu & ʚʆɞ Sønïč Ĩsågï ʚʆɞ",
-        userGreeting: `L'utilisateur se nomme ${senderName}`,
-        name_user: senderName,
-        zone,
-        humanmod,
-        history
-      };
-
-      const response = await axios.post(
-        'https://uchiha-perdu-api-models.vercel.app/api',
-        payload,
-        { headers: { 'Content-Type': 'application/json' }, timeout: 60000 }
-      );
-
-      let answer = response.data.response || 'Erreur : pas de réponse.';
-      let imageGenerated = false;
-
-      const imageGenMatch = answer.match(/Génération en cours\s*(?::)?\s*\[(.*?)\]/i);
-      if (imageGenMatch) {
-        const imagePrompt = imageGenMatch[1];
-        await message.reply('≪━─━━─━─◈─━──━─━≫\nGénération en cours... \n≪━─━──━─◈─━─━━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙');
-
-        try {
-          const imgResponse = await axios.get(
-            'https://uchiha-perdu-gen-api.vercel.app/image',
-            {
-              params: { key: API_KEY, prompt: imagePrompt },
-              responseType: 'arraybuffer',
-              headers: { 'User-Agent': 'Mozilla/5.0' },
-              timeout: 90000
-            }
-          );
-
-          if (imgResponse.data && imgResponse.data.length > 0) {
-            const success = await this.sendImageBuffer(Buffer.from(imgResponse.data), api, threadID, messageID);
-            if (success) {
-              answer = 'Génération réussie';
-              imageGenerated = true;
+            // Commandes GitHub spécifiques
+            else if (/^(stats|repo|infos)$/i.test(lowerCaseQuestion)) {
+                msg = await getRepoStats();
+            } else if (/^(contributors?|contributeurs?)$/i.test(lowerCaseQuestion)) {
+                msg = await getContributors();
+            } else if (/^(commits?|derniers commits)$/i.test(lowerCaseQuestion)) {
+                msg = await getLatestCommits();
+            } else if (/^(files?|fichiers)$/i.test(lowerCaseQuestion)) {
+                msg = await getFiles();
+            } else if (/^(readme|doc|documentation)$/i.test(lowerCaseQuestion)) {
+                msg = await getReadme();
+            } else if (/^(issues?|problèmes)$/i.test(lowerCaseQuestion)) {
+                msg = await getIssues();
+            } else if (/^(release|version)$/i.test(lowerCaseQuestion)) {
+                msg = await getLatestRelease();
             } else {
-              answer = 'Erreur lors de l\'envoi de l\'image.';
+                // Logique par défaut : demande à l'IA
+                if (lowerCaseQuestion.includes('sonic')) {
+                    msg += "🦔 " + getSonicFun() + "\n\n";
+                }
+                const aiAnswer = await askAI(question);
+                msg += `🤖 ${aiAnswer}\n\n`;
+
+                // Ajoute des stats du repo en bas
+                const repoStats = await getRepoStats();
+                msg += "\n" + repoStats;
             }
-          } else {
-            answer = 'Erreur : image non générée par l\'API.';
-          }
+
+            api.sendMessage(msg, event.threadID, event.messageID);
         } catch (err) {
-          console.error('Erreur génération image:', err);
-          answer = 'Erreur lors de la génération de l\'image.';
+            console.error(err);
+            api.sendMessage("❌ Une erreur générale est survenue. Vérifiez la console pour plus de détails.", event.threadID, event.messageID);
         }
-      }
-
-      if (!imageGenerated) {
-        answer = this.applyMarkdown(answer);
-      }
-
-      history.push({ role: 'user', content: prompt });
-      history.push({ role: 'assistant', content: answer });
-      fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
-
-      await message.reply(`≪━─━━─━─◈─━─━━─━≫\n${answer}\n≪━━─━─━─◈─━──━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
-    } catch (err) {
-      console.error('Erreur API:', err);
-      await message.reply(`≪━─━━─━─◈─━─━━─━≫\nErreur serveur. Réessaie plus tard, ${senderName} ! 😅\n≪━─━━─━─◈─━──━─━≫\n〘𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃〙`);
     }
-  }
 };
