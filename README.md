@@ -1,5 +1,5 @@
-<img src="https://i.ibb.co/RQ28H2p/banner.png" alt="banner">
-<h1 align="center"><img src="./dashboard/images/logo-non-bg.png" width="22px"> Goat Bot V2- Chatbot Messenger</h1>
+<img src="https://i.imgur.com/WB50Jsm.jpeg" alt="banner">
+<h1 align="center"><img src="./dashboard/images/logo-non-bg.png" width="22px">𝗛𝗲𝗱𝗴𝗲𝗵𝗼𝗴-𝗕𝗼𝘁-𝗩２ 𝗖𝗵𝗮𝘁𝗯𝗼𝘁 𝗠𝗲𝘀𝘀𝗲𝗻𝗴𝗲𝗿</h1>
 
 
 ## Introduction
