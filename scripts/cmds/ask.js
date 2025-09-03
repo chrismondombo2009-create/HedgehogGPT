@@ -2,9 +2,11 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const { OpenAI } = require("openai");
 
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "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"; // ⚠️ tronqué pour sécurité
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 const conversations = {};
+
+// 📖 Récupère le contenu principal d’un lien
 async function fetchMainContent(url) {
     try {
         const response = await axios.get(url, { timeout: 5000 });
@@ -17,17 +19,17 @@ async function fetchMainContent(url) {
             if (t.length > 20) text += t + "\n";
         });
 
-        return text.slice(0, 3000); // limiter pour sécurité
+        return text.slice(0, 3000);
     } catch (err) {
         console.error("Erreur fetchMainContent:", err.message);
         return null;
     }
 }
 
-// 🔮 Résumé automatique d'un texte avec l'IA
+// 🔮 Résumé automatique
 async function summarizeText(text) {
     try {
-        const prompt = `Résume le texte suivant de façon concise et pertinente (300 mots max) :\n${text}`;
+        const prompt = `Résume ce texte en gardant les infos essentielles (300 mots max) :\n${text}`;
         const completion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo",
             messages: [{ role: "user", content: prompt }],
@@ -41,7 +43,7 @@ async function summarizeText(text) {
     }
 }
 
-// 🔮 IA - ChatGPT avec mémoire et lecture intelligente des liens
+// 🤖 Dialogue IA amélioré (style + liens proposés par l’IA)
 async function askAI(userID, question) {
     if (!OPENAI_API_KEY) return null;
 
@@ -49,12 +51,17 @@ async function askAI(userID, question) {
         conversations[userID] = [
             {
                 role: "system",
-                content: "Tu es un assistant utile, concis et expert en Node.js, GitHub et JavaScript. Ton créateur est ʚʆɞ Ïsågĩ Sønïč ʚʆɞ (https://facebook.com/hedgehog.san.1492), et tu le respectes et le reconnais comme tel."
+                content: `Tu es un assistant utile, naturel et sympathique. 
+                Tu discutes comme un vrai individu, pas comme un robot. 
+                Si l’utilisateur a besoin de ressources (exemple docs, tutoriels, articles), 
+                propose-lui des liens pertinents (docs Node.js, GitHub, MDN, etc.) 
+                en les intégrant dans tes réponses. 
+                Ton créateur est ʚʆɞ Ïsågĩ Sønïč ʚʆɞ (https://facebook.com/hedgehog.san.1492).`
             }
         ];
     }
 
-    // Détecter liens
+    // 🔍 Détection des liens envoyés par l’utilisateur
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const urls = question.match(urlRegex) || [];
 
@@ -63,7 +70,7 @@ async function askAI(userID, question) {
         const mainText = await fetchMainContent(url);
         if (mainText) {
             const summary = await summarizeText(mainText);
-            extraContent += `\nRésumé du lien ${url} :\n${summary}\n`;
+            extraContent += `\n📌 Résumé du lien ${url} :\n${summary}\n`;
         }
     }
 
@@ -75,7 +82,7 @@ async function askAI(userID, question) {
             model: "gpt-3.5-turbo",
             messages: conversations[userID],
             max_tokens: 1000,
-            temperature: 0.7
+            temperature: 0.8 // 👉 un peu plus de créativité
         });
 
         const answer = completion.choices?.[0]?.message?.content || null;
@@ -98,13 +105,13 @@ module.exports = {
     config: {
         name: "ask",
         aliases: ["sonic"],
-        version: "2.5",
+        version: "3.0",
         author: "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝚇𝙀 3.0★彡",
         role: 0,
-        shortDescription: "Dialogue IA + lecture intelligente et résumée des liens",
-        longDescription: "L’IA se souvient de tes messages, peut lire le contenu principal des liens et générer des résumés pour répondre de façon précise et concise.",
+        shortDescription: "Dialogue IA naturel + liens pertinents",
+        longDescription: "L’IA discute naturellement, se souvient de tes messages, lit et résume les liens que tu envoies et peut aussi te donner des liens utiles (docs, tutos, GitHub).",
         category: "ai",
-        guide: "ask <question ou lien(s)>\nL’IA va lire et résumer le contenu principal des liens pour répondre intelligemment."
+        guide: "ask <question ou lien(s)>"
     },
     onStart: async function ({ api, event, args }) {
         const question = args.join(" ");
