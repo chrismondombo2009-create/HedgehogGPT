@@ -1,102 +1,77 @@
+const fs = require("fs");
+const path = require("path");
 const axios = require("axios");
-const cheerio = require("cheerio");
 const { OpenAI } = require("openai");
 
-const OPENAI_API_KEY = "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"; // ⚠️ tronqué pour sécurité
+const GITHUB_REPO = "Sonic-Shisui/Hedgehog-Bot-V2";
+const GITHUB_TOKEN = "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";
+const OPENAI_API_KEY = "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";
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const conversations = {};
 
-// 📖 Récupère le contenu principal d’un lien
-async function fetchMainContent(url) {
+// 📂 Fichier de sauvegarde des conversations
+const memoryFile = path.join(__dirname, "conversations.json");
+
+// 📝 Charger la mémoire depuis le fichier
+let conversations = {};
+if (fs.existsSync(memoryFile)) {
     try {
-        const response = await axios.get(url, { timeout: 5000 });
-        const $ = cheerio.load(response.data);
-        $("script, style, iframe, noscript, nav, footer, header, aside, .ads, .promo").remove();
-
-        let text = "";
-        $("h1, h2, h3, h4, p").each((i, el) => {
-            const t = $(el).text().replace(/\s+/g, " ").trim();
-            if (t.length > 20) text += t + "\n";
-        });
-
-        return text.slice(0, 3000);
-    } catch (err) {
-        console.error("Erreur fetchMainContent:", err.message);
-        return null;
+        conversations = JSON.parse(fs.readFileSync(memoryFile, "utf8"));
+    } catch (e) {
+        console.error("Erreur lecture conversations.json:", e);
+        conversations = {};
     }
 }
 
-// 🔮 Résumé automatique
-async function summarizeText(text) {
-    try {
-        const prompt = `Résume ce texte en gardant les infos essentielles (300 mots max) :\n${text}`;
-        const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [{ role: "user", content: prompt }],
-            max_tokens: 400,
-            temperature: 0.7
-        });
-        return completion.choices?.[0]?.message?.content || text;
-    } catch (err) {
-        console.error("Erreur summarizeText:", err.message);
-        return text;
-    }
+// 📨 Suivi du dernier message IA par thread + utilisateur
+const lastAIMessage = {};
+const activeThreads = {};
+
+// 💾 Sauvegarde automatique
+function saveMemory() {
+    fs.writeFileSync(memoryFile, JSON.stringify(conversations, null, 2), "utf8");
 }
 
-// 🤖 Dialogue IA amélioré (style + liens proposés par l’IA)
+// 🔮 IA - ChatGPT avec mémoire persistante
 async function askAI(userID, question) {
     if (!OPENAI_API_KEY) return null;
 
     if (!conversations[userID]) {
         conversations[userID] = [
-            {
-                role: "system",
-                content: `Tu es un assistant utile, naturel et sympathique. 
-                Tu discutes comme un vrai individu, pas comme un robot. 
-                Si l’utilisateur a besoin de ressources (exemple docs, tutoriels, articles), 
-                propose-lui des liens pertinents (docs Node.js, GitHub, MDN, etc.) 
-                en les intégrant dans tes réponses. 
-                Ton créateur est ʚʆɞ Ïsågĩ Sønïč ʚʆɞ (https://facebook.com/hedgehog.san.1492).`
+            { 
+                role: "system", 
+                content: `⚠️ Info système :
+Tu es un gangster qui parle avec confiance, arrogance et humour noir 😏.
+Tu balances des punchlines de rue, t’utilises des expressions de caïd, mais tu donnes quand même de vraies réponses utiles et intelligentes. 
+Ton style est familier, provocateur comme un rappeur ou un mec du ghetto, mais jamais insultant envers l’utilisateur.
+
+👉 Tu peux fournir des liens web (en format complet, exemple https://exemple.com) si tu juges que ça aide l’utilisateur. 
+
+⚡ Ton créateur officiel est : ʚʆɞ Ïsågĩ Sønïč ʚʆɞ  
+📎 Son compte Facebook : https://facebook.com/hedgehog.san.1492`
             }
         ];
     }
 
-    // 🔍 Détection des liens envoyés par l’utilisateur
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const urls = question.match(urlRegex) || [];
-
-    let extraContent = "";
-    for (const url of urls) {
-        const mainText = await fetchMainContent(url);
-        if (mainText) {
-            const summary = await summarizeText(mainText);
-            extraContent += `\n📌 Résumé du lien ${url} :\n${summary}\n`;
-        }
-    }
-
-    const finalQuestion = question + extraContent;
-    conversations[userID].push({ role: "user", content: finalQuestion });
+    conversations[userID].push({ role: "user", content: question });
 
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo",
             messages: conversations[userID],
-            max_tokens: 1000,
-            temperature: 0.8 // 👉 un peu plus de créativité
+            max_tokens: 600,
+            temperature: 0.9
         });
 
         const answer = completion.choices?.[0]?.message?.content || null;
 
         if (answer) {
             conversations[userID].push({ role: "assistant", content: answer });
-            if (conversations[userID].length > 20) {
-                conversations[userID] = [conversations[userID][0], ...conversations[userID].slice(-19)];
-            }
+            saveMemory(); 
         }
 
         return answer;
-    } catch (err) {
-        console.error("Erreur OpenAI:", err.response?.status, err.response?.data);
+    } catch (error) {
+        console.error("Erreur OpenAI:", error.response?.status, error.response?.data);
         return null;
     }
 }
@@ -105,14 +80,15 @@ module.exports = {
     config: {
         name: "ask",
         aliases: ["sonic"],
-        version: "3.0",
+        version: "4.3",
         author: "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝚇𝙀 3.0★彡",
         role: 0,
-        shortDescription: "Dialogue IA naturel + liens pertinents",
-        longDescription: "L’IA discute naturellement, se souvient de tes messages, lit et résume les liens que tu envoies et peut aussi te donner des liens utiles (docs, tutos, GitHub).",
+        shortDescription: "Discussion gangster avec l'IA (avec liens et mention du créateur).",
+        longDescription: "Le bot répond comme un vrai gangster 😏. Il balance des liens utiles si nécessaire et reconnaît son créateur officiel : ʚʆɞ Ïsågĩ Sønïč ʚʆɞ.",
         category: "ai",
-        guide: "ask <question ou lien(s)>"
+        guide: "ask <ta question>\nEnsuite continue à écrire, l’IA te répondra automatiquement (seulement toi, en mode gangster)."
     },
+
     onStart: async function ({ api, event, args }) {
         const question = args.join(" ");
         if (!question) return api.sendMessage("❓| Pose ta question à l’IA", event.threadID, event.messageID);
@@ -122,16 +98,86 @@ module.exports = {
 
             if (aiAnswer) {
                 api.setMessageReaction("✅", event.messageID, () => {}, true);
+
                 const msg = `➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ\n◆━━━━━━━▣✦▣━━━━━━━━◆\n${aiAnswer}\n◆━━━━━━━▣✦▣━━━━━━━━◆`;
-                api.sendMessage(msg, event.threadID, event.messageID);
+
+                api.sendMessage(msg, event.threadID, (err, info) => {
+                    if (!err) {
+                        lastAIMessage[event.threadID] = info.messageID;
+                        activeThreads[event.threadID] = { userID: event.senderID, lastActive: Date.now() };
+                    }
+                }, event.messageID);
             } else {
                 api.setMessageReaction("🤔", event.messageID, () => {}, true);
-                api.sendMessage("❌ Je n’ai pas pu répondre à ta question.", event.threadID, event.messageID);
+                api.sendMessage("❌ J’ai rien trouvé à dire mon reuf.", event.threadID, event.messageID);
             }
         } catch (err) {
             console.error(err);
             api.setMessageReaction("🤔", event.messageID, () => {}, true);
-            api.sendMessage("❌ Une erreur est survenue avec l’IA.", event.threadID, event.messageID);
+            api.sendMessage("❌ Erreur technique, t’inquiète j’gère ça frérot.", event.threadID, event.messageID);
+        }
+    },
+
+    onReply: async function ({ api, event }) {
+        const { threadID, messageID, body, senderID, messageReply } = event;
+
+        if (messageReply && lastAIMessage[threadID] && messageReply.messageID === lastAIMessage[threadID]) {
+            if (activeThreads[threadID]?.userID !== senderID) return;
+
+            try {
+                const aiAnswer = await askAI(senderID, body);
+
+                if (aiAnswer) {
+                    api.setMessageReaction("✅", messageID, () => {}, true);
+
+                    const msg = `➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ\n◆━━━━━━━▣✦▣━━━━━━━━◆\n${aiAnswer}\n◆━━━━━━━▣✦▣━━━━━━━━◆`;
+
+                    api.sendMessage(msg, threadID, (err, info) => {
+                        if (!err) {
+                            lastAIMessage[threadID] = info.messageID;
+                            activeThreads[threadID].lastActive = Date.now();
+                        }
+                    }, messageID);
+                } else {
+                    api.setMessageReaction("🤔", messageID, () => {}, true);
+                    api.sendMessage("❌ Rien à dire là-dessus poto.", threadID, messageID);
+                }
+            } catch (err) {
+                console.error(err);
+                api.setMessageReaction("🤔", messageID, () => {}, true);
+                api.sendMessage("❌ Une erreur est survenue, reste cool frérot.", threadID, messageID);
+            }
+        }
+    },
+
+    onChat: async function ({ api, event }) {
+        const { threadID, messageID, body, senderID } = event;
+        const threadData = activeThreads[threadID];
+
+        if (!threadData || Date.now() - threadData.lastActive > 10 * 60 * 1000 || threadData.userID !== senderID) return;
+
+        try {
+            const aiAnswer = await askAI(senderID, body);
+
+            if (aiAnswer) {
+                api.setMessageReaction("✅", messageID, () => {}, true);
+
+                const msg = `➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ\n◆━━━━━━━▣✦▣━━━━━━━━◆\n${aiAnswer}\n◆━━━━━━━▣✦▣━━━━━━━━◆`;
+
+                api.sendMessage(msg, threadID, (err, info) => {
+                    if (!err) {
+                        lastAIMessage[threadID] = info.messageID;
+                        activeThreads[threadID].lastActive = Date.now();
+                    }
+                }, messageID);
+            } else {
+                api.setMessageReaction("🤔", messageID, () => {}, true);
+                api.sendMessage("❌ Rien à te balancer là frérot.", threadID, messageID);
+            }
+        } catch (err) {
+            console.error(err);
+            api.setMessageReaction("🤔", messageID, () => {}, true);
+            api.sendMessage("❌ J’ai buggé, mais j’reviens fort mon gars sûr.", threadID, messageID);
         }
     }
 };
