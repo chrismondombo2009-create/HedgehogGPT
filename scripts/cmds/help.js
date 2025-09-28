@@ -1,145 +1,128 @@
-/**
- * Commande: help (style BRAYAN BOT Unicode)
- * ⚠️ Assurez-vous que le fichier est enregistré en UTF-8
- */
+ const fs = require("fs-extra");
+const axios = require("axios");
+const path = require("path");
+const { getPrefix } = global.utils;
+const { commands, aliases } = global.GoatBot;
+const doNotDelete = "╭━[ HELP LIST  ]━━╮\n╰━━━━━━━━━━━━━━━━╯";
+
+function applyFont(text) {
+  const fontMap = {
+    'A': '𝙰', 'B': '𝙱', 'C': '𝙲', 'D': '𝙳', 'E': '𝙴', 'F': '𝙵',
+    'G': '𝙶', 'H': '𝙷', 'I': '𝙸', 'J': '𝙹', 'K': '𝙺', 'L': '𝙻',
+    'M': '𝙼', 'N': '𝙽', 'O': '𝙾', 'P': '𝙿', 'Q': '𝚀', 'R': '𝚁',
+    'S': '𝚂', 'T': '𝚃', 'U': '𝚄', 'V': '𝚅', 'W': '𝚆', 'X': '𝚇',
+    'Y': '𝚈', 'Z': '𝚉',
+    'a': '𝚊', 'b': '𝚋', 'c': '𝚌', 'd': '𝚍', 'e': '𝚎', 'f': '𝚏',
+    'g': '𝚐', 'h': '𝚑', 'i': '𝚒', 'j': '𝚓', 'k': '𝚔', 'l': '𝚕',
+    'm': '𝚖', 'n': '𝚗', 'o': '𝚘', 'p': '𝚙', 'q': '𝚚', 'r': '𝚛',
+    's': '𝚜', 't': '𝚝', 'u': '𝚞', 'v': '𝚟', 'w': '𝚠', 'x': '𝚡',
+    'y': '𝚢', 'z': '𝚣'
+  };
+  return text.split('').map(char => fontMap[char] || char).join('');
+}
 
 module.exports = {
   config: {
     name: "help",
-    aliases: ["h", "menu"],
-    version: "2.3.0",
-    author: "chatgpt",
-    cooldown: 3,
+    version: "1.2",
+    author: "messie osango ",
+    countDown: 5,
     role: 0,
     shortDescription: {
-      fr: "Affiche la liste des commandes avec style BRAYAN BOT"
+      en: "View command usage and list"
     },
     longDescription: {
-      fr: "Menu d'aide avec catégories et style encadré Unicode, identique à l'exemple fourni."
+      en: "View detailed command usage and list all available commands"
     },
-    category: "système",
+    category: "info",
     guide: {
-      fr: "{pn} [catégorie|commande]"
-    }
+      en: "{pn} [command_name]"
+    },
+    priority: 1
   },
 
-  onStart: async function (ctx) {
-    return runHelp(ctx);
-  },
-  run: async function (ctx) {
-    return runHelp(ctx);
+  onStart: async function ({ message, args, event, threadsData, role }) {
+    const { threadID } = event;
+    const prefix = await getPrefix(threadID);
+
+    if (args.length === 0) {
+      const categories = {};
+      let msg = `╭━[ ${applyFont("COMMAND LIST")} ]━━╮\n┃\n┃  ${applyFont("brayan ")}\n┃\n╰━━━━━━━━━━━━━━━━╯\n`;
+
+      for (const [name, value] of commands) {
+        if (value.config.role > role) continue;
+        const category = value.config.category || "NO CATEGORY";
+        if (!categories[category]) {
+          categories[category] = { commands: [] };
+        }
+        categories[category].commands.push(name);
+      }
+
+      Object.keys(categories).sort().forEach(category => {
+        const formattedCategory = applyFont(category.toUpperCase());
+        msg += `╭━[ ${formattedCategory} ]━━╮\n┃\n`;
+
+        categories[category].commands.sort().forEach(name => {
+          msg += `┃ ✦ ${applyFont(name)}\n`;
+        });
+
+        msg += `┃\n╰━━━━━━━━━━━━━━━━╯\n`;
+      });
+
+      const totalCommands = commands.size;
+      msg += `╭━[ ${applyFont("INFORMATION")} ]━━╮\n┃\n`;
+      msg += `┃ ${applyFont("TOTAL COMMANDS")}: ${totalCommands}\n`;
+      msg += `┃ ${applyFont("PREFIX")}: ${prefix}\n`;
+      msg += `┃\n┃ ${applyFont("Type")} ${prefix}help cmd_name\n`;
+      msg += `┃ ${applyFont("to view command details")}\n┃\n`;
+      msg += `╰━━━━━━━━━━━━━━━━╯\n`;
+      msg += doNotDelete;
+
+      await message.reply({ body: msg });
+    } else {
+      const commandName = args[0].toLowerCase();
+      const command = commands.get(commandName) || commands.get(aliases.get(commandName));
+
+      if (!command) {
+        await message.reply(`╭━[ ${applyFont("ERROR")} ]━━╮\n┃\n┃ ${applyFont("Command not found")}\n┃\n╰━━━━━━━━━━━━━━━━╯`);
+      } else {
+        const configCommand = command.config;
+        const roleText = roleTextToString(configCommand.role);
+        const author = configCommand.author || "Unknown";
+
+        const longDescription = configCommand.longDescription?.en || "No description";
+        const guideBody = configCommand.guide?.en || "No guide available.";
+        const usage = guideBody.replace(/{p}/g, prefix).replace(/{n}/g, configCommand.name);
+
+        const response = `╭━[ ${applyFont("COMMAND INFO")} ]━━╮
+┃
+┃ ${applyFont("NAME")}: ${configCommand.name}
+┃ ${applyFont("VERSION")}: ${configCommand.version || "1.0"}
+┃ ${applyFont("AUTHOR")}: ${applyFont(author)}
+┃
+┃ ${applyFont("DESCRIPTION")}:
+┃ ${longDescription}
+┃
+┃ ${applyFont("USAGE")}:
+┃ ${usage}
+┃
+┃ ${applyFont("ALIASES")}: ${configCommand.aliases ? configCommand.aliases.map(a => applyFont(a)).join(", ") : "None"}
+┃ ${applyFont("ROLE")}: ${roleText}
+┃ ${applyFont("COOLDOWN")}: ${configCommand.countDown || 2}s
+┃
+╰━━━━━━━━━━━━━━━━╯`;
+
+        await message.reply(response);
+      }
+    }
   }
 };
 
-async function runHelp(context) {
-  const { message, args = [], commandName = "help", prefix } = normalizeContext(context);
-  const registry = getRegistry();
-  if (!registry) return message.reply("❌ Impossible de lire le registre des commandes.");
-
-  if (args.length) {
-    const query = args.join(" ").trim();
-    const foundCommand = findCommand(registry, query);
-    if (foundCommand) return message.reply(formatCommandCard(foundCommand, { prefix }));
-
-    const byCat = groupByCategory(registry);
-    const catKey = Object.keys(byCat).find(k => k.toLowerCase() === query.toLowerCase());
-    if (catKey) return message.reply(formatCategoryMenu(catKey, byCat[catKey], { prefix, commandName }));
-
-    return message.reply(`🤔 Rien trouvé pour "${query}".`);
+function roleTextToString(roleText) {
+  switch (roleText) {
+    case 0: return applyFont("All users");
+    case 1: return applyFont("Group admins");
+    case 2: return applyFont("Bot admins");
+    default: return applyFont("Unknown");
   }
-
-  return message.reply(formatPagedMenu(registry, { prefix, commandName }));
-}
-
-function normalizeContext(ctx) {
-  const message = ctx.message || ctx.api?.sendMessage && {
-    reply: (m) => ctx.api.sendMessage(m, ctx.event?.threadID, ctx.event?.messageID)
-  } || { reply: () => {} };
-  return {
-    message,
-    args: ctx.args || ctx.event?.body?.split(/\s+/).slice(1) || [],
-    commandName: ctx.commandName || "help",
-    prefix: ctx.prefix || global.GoatBot?.config?.prefix || global.client?.config?.prefix || "+"
-  };
-}
-
-function getRegistry() {
-  const map = global.GoatBot?.commands || global.client?.commands;
-  if (!map) return null;
-  const list = [];
-  for (const [name, command] of map.entries()) {
-    const config = command.config || {};
-    list.push({ name: config.name || name, config, command });
-  }
-  return list;
-}
-
-function formatPagedMenu(registry, { prefix = "+", commandName = "help" }) {
-  const byCat = groupByCategory(registry);
-  let text = "╭━━⫷HELP LIST⫸━━╮\n\n";
-
-  for (const cat of Object.keys(byCat)) {
-    text += `╭─────⟪ ${cat.toUpperCase()} ⟫─────╮\n`;
-    for (const { name } of byCat[cat]) {
-      text += `┃ ✦ ${name}\n`;
-    }
-    text += "╰─────────────────╯\n\n";
-  }
-
-  text += `⫸ ${registry.length} commandes disponibles\n`;
-  text += `⫸ ${prefix}${commandName} [nom] pour plus d'info\n`;
-  text += `⫸ Problème ? Contactez l’admin via ${prefix}callad\n`;
-  text += "⫷ Brayan Ð-Grimɱ ⫸";
-  return text;
-}
-
-function formatCategoryMenu(category, items, { prefix = "+", commandName = "help" }) {
-  let text = `╭─────⟪ ${category.toUpperCase()} ⟫─────╮\n`;
-  for (const { name } of items) {
-    text += `┃ ✦ ${name}\n`;
-  }
-  text += "╰─────────────────╯\n";
-  text += `\n⫸ ${items.length} commandes dans ${category}\n`;
-  text += `⫸ Retour: ${prefix}${commandName}`;
-  return text;
-}
-
-function formatCommandCard(entry, { prefix = "+" }) {
-  const { name, config } = entry;
-  const desc = pickDesc(config) || "Aucune description.";
-  const usage = typeof config.guide === "string" ? config.guide : (config.guide?.fr || `{pn}`);
-  const guide = usage.replaceAll("{pn}", `${prefix}${name}`);
-  const aliases = Array.isArray(config.aliases) && config.aliases.length ? config.aliases.join(", ") : "—";
-  const role = config.role ?? 0;
-  const cooldown = config.cooldown ?? 0;
-  const category = config.category || "autre";
-
-  return `╭━━⫷ ${name.toUpperCase()} ⫸━━╮\n` +
-         `📖 Description: ${desc}\n` +
-         `📌 Utilisation: ${guide}\n` +
-         `🧩 Alias: ${aliases}\n` +
-         `⏳ Cooldown: ${cooldown}s\n` +
-         `🔒 Rôle requis: ${role}\n` +
-         `🗂️ Catégorie: ${category}\n` +
-         `╰━━━━━━━━━━━━━━━━━━╯`;
-}
-
-function groupByCategory(registry) {
-  return registry.reduce((acc, it) => {
-    const cat = (it.config.category || "autre").trim();
-    (acc[cat] ||= []).push(it);
-    return acc;
-  }, {});
-}
-
-function findCommand(registry, query) {
-  const q = query.toLowerCase();
-  return registry.find(({ name, config }) =>
-    name.toLowerCase() === q || (Array.isArray(config.aliases) && config.aliases.map(a => a.toLowerCase()).includes(q))
-  );
-}
-
-function pickDesc(config = {}) {
-  if (typeof config.shortDescription === "string") return config.shortDescription;
-  return config.shortDescription?.fr || config.shortDescription?.en || config.longDescription?.fr || config.longDescription?.en || "";
 }
