@@ -1,4 +1,116 @@
-{
-  "uid": "61578433048588",
-  "amount": 5000000000000
+// ===============================
+// 💰 UCHIWA BANK — Gestion des comptes 💾
+// ===============================
+const fs = require("fs");
+const path = require("path");
+
+const BANK_FILE = path.join(__dirname, "bank.json");
+
+// 📂 Vérifie que le fichier existe, sinon le crée vide
+if (!fs.existsSync(BANK_FILE)) {
+  fs.writeFileSync(BANK_FILE, JSON.stringify({}, null, 2));
+  console.log("📁 Nouveau fichier bank.json créé !");
 }
+
+// 🔄 Charge les données bancaires
+let bankData = {};
+try {
+  const data = fs.readFileSync(BANK_FILE, "utf8");
+  bankData = JSON.parse(data);
+} catch (err) {
+  console.error("⚠️ Erreur de lecture du fichier bank.json :", err);
+  bankData = {};
+}
+
+// 💾 Sauvegarde automatique (sécurisée)
+function saveBankData() {
+  try {
+    fs.writeFileSync(BANK_FILE, JSON.stringify(bankData, null, 2));
+  } catch (err) {
+    console.error("❌ Erreur lors de la sauvegarde bank.json :", err);
+  }
+}
+
+// ⚙️ Crée un compte si inexistant
+function ensureAccount(userId) {
+  if (!bankData[userId]) {
+    bankData[userId] = {
+      wallet: 0,
+      bank: 0,
+      loans: 0,
+      karma: 0,
+      achievements: [],
+      lastDaily: 0,
+      history: []
+    };
+    saveBankData();
+  }
+}
+
+// 💸 Ajouter de l’argent
+function addMoney(userId, amount, source = "gain") {
+  ensureAccount(userId);
+  bankData[userId].wallet += amount;
+  addHistory(userId, `💰 +${amount} (source: ${source})`);
+  saveBankData();
+}
+
+// 💸 Retirer de l’argent
+function removeMoney(userId, amount, reason = "spent") {
+  ensureAccount(userId);
+  bankData[userId].wallet = Math.max(0, bankData[userId].wallet - amount);
+  addHistory(userId, `💸 -${amount} (reason: ${reason})`);
+  saveBankData();
+}
+
+// 🏦 Dépôt dans la banque
+function deposit(userId, amount) {
+  ensureAccount(userId);
+  if (bankData[userId].wallet < amount) return false;
+  bankData[userId].wallet -= amount;
+  bankData[userId].bank += amount;
+  addHistory(userId, `🏦 Dépôt ${amount}`);
+  saveBankData();
+  return true;
+}
+
+// 💳 Retrait depuis la banque
+function withdraw(userId, amount) {
+  ensureAccount(userId);
+  if (bankData[userId].bank < amount) return false;
+  bankData[userId].bank -= amount;
+  bankData[userId].wallet += amount;
+  addHistory(userId, `🏧 Retrait ${amount}`);
+  saveBankData();
+  return true;
+}
+
+// 📜 Historique
+function addHistory(userId, text) {
+  ensureAccount(userId);
+  const entry = { text, date: new Date().toLocaleString() };
+  bankData[userId].history.unshift(entry);
+  if (bankData[userId].history.length > 50) bankData[userId].history.pop();
+}
+
+// 📊 Récupération des infos
+function getBalance(userId) {
+  ensureAccount(userId);
+  return {
+    wallet: bankData[userId].wallet,
+    bank: bankData[userId].bank,
+    loans: bankData[userId].loans
+  };
+}
+
+// 🧠 Exportation des fonctions
+module.exports = {
+  bankData,
+  saveBankData,
+  ensureAccount,
+  addMoney,
+  removeMoney,
+  deposit,
+  withdraw,
+  getBalance
+};
