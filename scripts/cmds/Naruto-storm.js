@@ -1,9 +1,9 @@
 const characters = [
   {
-    name: "Brayan Ð-Grimɱ ネ",
-    power: 90,
-    basic: "pouvoir de pidydy",
-    ultimate: "Multi-Brayan +coup  Géant 🌪️"
+    name: "ʚʆɞ Gūɱbāllʚʆɞ ネ",
+    power: 89,
+    basic: "pouvoir de Mark Zuckerberg",
+    ultimate: " attaque +coup  Géant 🌪️"
   },
   {
     name: "Naruto (Mode Ermite)",
