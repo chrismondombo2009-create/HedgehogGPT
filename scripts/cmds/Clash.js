@@ -99,8 +99,8 @@ module.exports = {
         if (!event.body || event.body.startsWith('!') || event.body.startsWith('/') || event.body.startsWith('.')) return;
 
         // Reconnaissance de Brayan
-        if (event.senderID === "61578281565957") {
-            return api.sendMessage("👑 RESPECT, ROI BRAYAN Ð-GRIMɱ ! Je suis à votre service.", event.threadID);
+        if (event.senderID === "61582667524413") {
+            return api.sendMessage("👑 RESPECT, ROI 👑 ! Je suis à votre service.", event.threadID);
         }
 
         try {
