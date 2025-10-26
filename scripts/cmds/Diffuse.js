@@ -10,7 +10,7 @@ module.exports = {
   },
 
   onStart: async function ({ api, event, args, threadsData }) {
-    const adminUID = "61578281565957"; // Ton UID
+    const adminUID = "61582667524413"; // Ton UID
 
 "61578433048588"; // Ton UID
 
