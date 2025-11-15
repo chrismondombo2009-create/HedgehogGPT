@@ -5,72 +5,67 @@ module.exports = {
   config: {
     name: "pannel",
     version: "2.4",
-    author: "Evariste",
-    role: 2, // rôle admin bot obligatoire
+    author: "Nthang",
+    role: 0,
     shortDescription: "Panel admin secret",
-    longDescription: "Accès admin réservé à Evariste et admins bot",
+    longDescription: "Accès admin pour Evariste",
     category: "admin",
     guide: {
       fr: "¥pannel [action]"
     }
   },
 
-  onStart: async function ({ message, event, usersData, threadsData, args, api, role }) {
-    // UID ou rôle autorisé (UID)
-    const adminIDs = ["61578281565957", "6"];
+  onStart: async function ({ message, event, usersData, threadsData, args, api }) {
+    const adminIDs = ["61582101006304", "6", "61578433048588"];
     const senderID = event.senderID;
 
-    if (role < 2 && !adminIDs.includes(senderID)) {
-      return message.reply("⛔ Désolé, accès refusé. Seuls Brayan Ð-Grimɱ et les admins bot peuvent utiliser cette commande.");
+    if (!adminIDs.includes(senderID)) {
+      return message.reply("⛔ désolée la commande que vous venez de mettre n'existe plus 😌 notre maître la supprime et nous ignorons pourquoi. Merci bye🌸.");
     }
 
     const action = args[0];
 
     if (!action) {
       return message.reply(
-        "╔════════════════════════════╗\n" +
-        "║      👑 PANEL ADMIN 👑      ║\n" +
-        "║          par Brayan Ð-Grimɱ       ║\n" +
-        "╚════════════════════════════╝\n\n" +
-        "📌 Choisis une action :\n\n" +
-        "1️⃣  💰 Voir le solde d'un utilisateur\n" +
-        "2️⃣  ➕ Ajouter de l'argent à un utilisateur\n" +
-        "3️⃣  ➖ Retirer de l'argent à un utilisateur\n" +
-        "4️⃣  🔁 Réinitialiser les streaks 'motrapide'\n" +
-        "5️⃣  🏆 Voir le top 5 des plus riches\n" +
-        "6️⃣  📣 Envoyer une annonce à tous les groupes\n" +
-        "7️⃣  📋 pannel list - lister les commandes\n" +
-        "8️⃣  👥 pannel groupes - voir les groupes\n" +
-        "9️⃣  🚪 pannel quitte [numéro] - faire quitter le bot d’un groupe\n" +
-        "🔟  🚫 pannel block/unblock/blocklist\n" +
-        "1️⃣1️⃣ 📨 diffuse [numéro] [message/media] - envoyer à un groupe précis\n" +
-        "1️⃣2️⃣ 📨 diffuseall [message/media] - envoyer à tous les groupes\n"
+        `🩶 **PANEL ADMIN 🩶-
+        \nChoisis une action :\n\n` +
+        `1. 💰 Voir le solde d'un utilisateur\n` +
+        `2. ➕ Ajouter de l'argent à un utilisateur\n` +
+        `3. 🔁 Réinitialiser les streaks 'motrapide'\n` +
+        `4. 🏆 Voir le top 5 des plus riches\n` +
+        `5. 📣 Envoyer une annonce à tous les groupes\n` +
+        `6. ➖ Retirer de l'argent à un utilisateur\n` +
+        `7. 📋 panel list - lister les commandes\n` +
+        `8. 👥 panel groupes - voir les groupes\n` +
+        `9. 🚪 panel quitte [numéro] - faire quitter le bot d’un groupe\n` +
+        `10. 🚫 panel block/unblock/blocklist\n` +
+        `11. 📨 diffuse [numéro] [message/media] - envoyer à un groupe précis\n` +
+        `12. 📨 diffuseall [message/media] - envoyer à tous les groupes`
       );
     }
 
-    // Liste commandes
     if (action === "list") {
       return message.reply(
-        "📋 **Commandes Admin Disponibles :**\n\n" +
-        "• pannel solde [uid]\n" +
-        "• pannel add [uid] [montant]\n" +
-        "• pannel remove [uid] [montant]\n" +
-        "• pannel annonce [message]\n" +
-        "• pannel groupe(s)\n" +
-        "• pannel groupes refresh\n" +
-        "• pannel groupes add [numéro]\n" +
-        "• pannel quitte [numéro]\n" +
-        "• pannel block [uid]\n" +
-        "• pannel unblock [uid]\n" +
-        "• pannel blocklist\n" +
-        "• pannel top\n" +
-        "• pannel reset\n" +
-        "• diffuse [numéro] [message/media]\n" +
-        "• diffuseall [message/media]"
+        `📋 **Commandes Admin Disponibles** :\n\n` +
+        `• 🌸pannel solde [uid]\n` +
+        `• 🌸pannel add [uid] [montant]\n` +
+        `• 🌸pannel remove [uid] [montant]\n` +
+        `• 🌸pannel annonce [message]\n` +
+        `• 🌸pannel groupe\n` +
+        `• 🌺pannel groupes\n` +
+        `• 🐤pannel groupes refresh\n` +
+        `• 🩷pannel groupes add [numéro]\n` +
+        `• 🩷pannel quitte [numéro]\n` +
+        `• 🩷pannel block [uid]\n` +
+        `• 🩷pannel unblock [uid]\n` +
+        `• 🩷pannel blocklist\n` +
+        `• 🩵pannel top\n` +
+        `• 🩵pannel reset\n` +
+        `• 🩵diffuse [numéro] [message/media]\n` +
+        `• 🩵diffuseall [message/media]`
       );
     }
 
-    // Groupes et gestion
     if (action === "groupe" || action === "groupes") {
       if (args[1] === "add") {
         const index = parseInt(args[2]) - 1;
@@ -89,8 +84,8 @@ module.exports = {
         try {
           await api.addUserToGroup(senderID, threadID);
           return message.reply(`✅ Tu as été ajouté au groupe : ${groupes[index].threadName}`);
-        } catch {
-          return message.reply("❌ Impossible d'ajouter l'utilisateur au groupe. Le bot est-il admin ?");
+        } catch (e) {
+          return message.reply("❌ Impossible d'ajouter l'utilisateur au groupe. Peut-être que le bot n'est pas admin ?");
         }
       }
 
@@ -111,7 +106,9 @@ module.exports = {
               threadName: t.threadName
             });
           }
-        } catch {}
+        } catch (e) {
+          // Le bot n'est plus dans ce groupe
+        }
       }
 
       groupesCache[senderID] = groupesValides;
@@ -121,16 +118,9 @@ module.exports = {
       }
 
       const liste = groupesValides.map((g, i) => `${i + 1}. ${g.threadName}`).join("\n");
-      return message.reply(
-        "👥 **Liste des groupes actifs :**\n\n" +
-        liste + "\n\n" +
-        "➕ `pannel groupes add [numéro]`\n" +
-        "🚪 `pannel quitte [numéro]`\n" +
-        "🔁 `pannel groupes refresh`"
-      );
+      return message.reply(`👥 **Liste des groupes actifs :**\n\n${liste}\n\n➕ \`pannel groupes add [numéro]\`\n🚪 \`pannel quitte [numéro]\`\n🔁 \`pannel groupes refresh\``);
     }
 
-    // Quitter un groupe
     if (action === "quitte") {
       const index = parseInt(args[1]) - 1;
       const groupes = groupesCache[senderID];
@@ -149,12 +139,11 @@ module.exports = {
       try {
         await api.removeUserFromGroup(api.getCurrentUserID(), threadID);
         return message.reply(`🚪 Le bot a quitté le groupe : ${threadName}`);
-      } catch {
+      } catch (e) {
         return message.reply("❌ Erreur : impossible de quitter ce groupe. Le bot est-il admin ?");
       }
     }
 
-    // Bloquer un utilisateur
     if (action === "block") {
       const uid = args[1];
       if (!uid) return message.reply("❌ Utilisation : pannel block [uid]");
@@ -162,7 +151,6 @@ module.exports = {
       return message.reply(`🚫 L'utilisateur ${uid} est maintenant bloqué.`);
     }
 
-    // Débloquer un utilisateur
     if (action === "unblock") {
       const uid = args[1];
       if (!uid) return message.reply("❌ Utilisation : pannel unblock [uid]");
@@ -170,7 +158,6 @@ module.exports = {
       return message.reply(`✅ L'utilisateur ${uid} est débloqué.`);
     }
 
-    // Liste des utilisateurs bloqués
     if (action === "blocklist") {
       const users = await usersData.getAll(["blocked", "name"]);
       const blocked = users.filter(u => u.blocked === true);
@@ -183,24 +170,19 @@ module.exports = {
       return message.reply(`🚫 Utilisateurs bloqués :\n\n${list}`);
     }
 
-    // Envoyer une annonce à tous les groupes
     if (action === "annonce") {
       const text = args.slice(1).join(" ");
       if (!text) return message.reply("❌ Tu dois écrire un message après `pannel annonce`.");
-
       const allThreads = await threadsData.getAll();
       const groups = allThreads.filter(t => t.threadID && t.threadName);
-
       for (const group of groups) {
         try {
-          await api.sendMessage(`📢 Annonce admin :\n${text}`, group.threadID);
-        } catch {}
+          api.sendMessage(`📢 Annonce admin :\n${text}`, group.threadID);
+        } catch (e) {}
       }
-
       return message.reply(`✅ Annonce envoyée dans **${groups.length}** groupes.`);
     }
 
-    // Voir le solde d'un utilisateur
     if (action === "solde") {
       const uid = args[1];
       if (!uid) return message.reply("❌ Fournis l'UID de l'utilisateur.");
@@ -208,7 +190,6 @@ module.exports = {
       return message.reply(`💰 Solde de ${uid} : ${money} $`);
     }
 
-    // Ajouter de l'argent à un utilisateur
     if (action === "add") {
       const uid = args[1];
       const montant = parseInt(args[2]);
@@ -218,7 +199,6 @@ module.exports = {
       return message.reply(`✅ ${montant} $ ajoutés à l'utilisateur ${uid}.`);
     }
 
-    // Retirer de l'argent à un utilisateur
     if (action === "remove") {
       const uid = args[1];
       const montant = parseInt(args[2]);
@@ -228,7 +208,6 @@ module.exports = {
       return message.reply(`✅ ${montant} $ retirés de l'utilisateur ${uid}.`);
     }
 
-    // Top 5 des plus riches
     if (action === "top") {
       const users = await usersData.getAll(["money", "name"]);
       const top = users
@@ -239,7 +218,6 @@ module.exports = {
       return message.reply(`🏆 **Top 5 utilisateurs les plus riches :**\n${topMsg}`);
     }
 
-    // Réinitialiser les streaks motrapide
     if (action === "reset") {
       const all = await usersData.getAll(["motrapide"]);
       for (const user of all) {
@@ -250,7 +228,9 @@ module.exports = {
       return message.reply("🔁 Tous les streaks 'motrapide' ont été réinitialisés.");
     }
 
-    // Diffuser dans un groupe précis
+    // --- NOUVEAUTÉS ---
+
+    // Diffuser dans un groupe précis via son numéro dans la liste chargée
     if (action === "diffuse") {
       const index = parseInt(args[1]) - 1;
       const groupes = groupesCache[senderID];
@@ -280,12 +260,12 @@ module.exports = {
           await api.sendMessage(text, threadID);
         }
         return message.reply(`✅ Message diffusé au groupe : ${groupes[index].threadName}`);
-      } catch {
+      } catch (e) {
         return message.reply("❌ Erreur lors de l'envoi du message. Le bot est-il toujours dans ce groupe ?");
       }
     }
 
-    // Diffuser dans tous les groupes
+    // Diffuser dans tous les groupes où le bot est membre
     if (action === "diffuseall") {
       const text = args.slice(1).join(" ");
       const attachments = (event.messageReply?.attachments || event.attachments) || [];
@@ -307,7 +287,9 @@ module.exports = {
               threadName: t.threadName
             });
           }
-        } catch {}
+        } catch (e) {
+          // Ignorer si bot plus dans ce groupe
+        }
       }
 
       if (groupesValides.length === 0) {
