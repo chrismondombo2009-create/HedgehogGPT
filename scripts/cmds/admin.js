@@ -9,40 +9,30 @@ function getTimeSince(timestamp) {
   const minutes = Math.floor(diff / 60);
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h`;
+  if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  return `${days} j`;
+  return `${days}j`;
 }
 
 const GRADES = {
-  1: "Minable",
-  2: "Admin de rang inférieur",
-  3: "Soldat Divin",
-  4: "Guerrier Éclair",
-  5: "Maître des Ombres",
-  6: "Seigneur de Feu",
-  7: "Commandant Céleste",
-  8: "Gardien Éternel",
-  9: "Étoile Noire",
-  10: "Légende Immortelle",
-  11: "Destructeur des Âmes",
-  12: "Porteur de Chaos",
-  13: "Roi des Abysses",
-  14: "Faucheur Divin",
-  15: "Émissaire du Néant",
-  16: "Conquérant Stellaire",
-  17: "Gardien des Dimensions",
-  18: "Fléau Céleste",
-  19: "Ombre Éternelle",
-  20: "Grade Ultime",
+  0: "Nullos", 1: "Minable", 2: "Admin de rang inférieur", 3: "Soldat Divin", 4: "Guerrier Éclair",
+  5: "Maître des Ombres", 6: "Seigneur de Feu", 7: "Commandant Céleste", 8: "Gardien Éternel",
+  9: "Étoile Noire", 10: "Légende Immortelle", 11: "Destructeur des Âmes", 12: "Porteur de Chaos",
+  13: "Roi des Abysses", 14: "Faucheur Divin", 15: "Émissaire du Néant", 16: "Conquérant Stellaire",
+  17: "Gardien des Dimensions", 18: "Fléau Céleste", 19: "Ombre Éternelle", 20: "Grade Ultime",
   21: "Bras Droit du Chef"
 };
 
 const CHEF_SUPREME_UIDS = ["100083846212138", "61578433048588"];
-const SUPREME_NAMES = {
-  "100083846212138": "L'Uchiha Perdu",
-  "61578433048588": "Sømå Sønïč"
-};
+const SUPREME_NAMES = { "100083846212138": "L'Uchiha Perdu", "61578433048588": "Sømå Sønïč" };
+
+const INTRUDER_MESSAGES = [
+  "Tu croyais être malin en modifiant le code ? Dommage pour toi.",
+  "Tentative d'usurpation détectée. Bien essayé.",
+  "Les Chefs Suprêmes ne se touchent pas. Tu viens d'apprendre ça.",
+  "Ton petit UID est désormais chez les Nullos. Adieu.",
+  "Pathétique. Retourne dans l'ombre."
+];
 
 const PROTECTED_MESSAGES = [
   "Tu as osé tenter de supprimer le Chef Suprême ? Voilà où ça te mène !",
@@ -52,15 +42,17 @@ const PROTECTED_MESSAGES = [
   "%1 est éternel. Toi, pas tant que ça !"
 ];
 
+const BOX = "≪━─━─━─◈─━─━─━≫";
+const BOLD = str => str.split("").map(c => String.fromCharCode(c.charCodeAt(0) + 127439)).join("");
+
 const LOG_FILE = path.join(__dirname, "admin_logs.txt");
 const BACKUP_INTERVAL = 10 * 60 * 1000;
-
 let lastBackupTime = 0;
+let intruderDetected = null;
 
 function logAction(action, details) {
   const timestamp = new Date().toLocaleString("fr-FR", { timeZone: "Africa/Porto-Novo" });
-  const logEntry = `[${timestamp}] ${action} → ${details}\n`;
-  appendFileSync(LOG_FILE, logEntry, "utf8");
+  appendFileSync(LOG_FILE, `[${timestamp}] ${action} → ${details}\n`, "utf8");
 }
 
 function backupConfig() {
@@ -69,70 +61,54 @@ function backupConfig() {
   const backupFile = path.join(__dirname, `config_backup_${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
   writeFileSync(backupFile, JSON.stringify(config, null, 2));
   lastBackupTime = now;
-  logAction("BACKUP", `Config sauvegardé dans ${backupFile}`);
+  logAction("BACKUP", `Sauvegarde auto → ${backupFile}`);
 }
 
 module.exports = {
   config: {
     name: "admin",
-    version: "3.7",
+    version: "7.0",
     author: "L'Uchiha Perdu & Sømå Sønïč",
     countDown: 5,
     role: 2,
     description: "Gère les administrateurs avec style et puissance",
     category: "box chat",
-    guide: "{pn} [add | -a] <uid | @tag> [grade <grade>]: Ajoute un admin (grade 1-21, réservé aux Chefs Suprêmes)\n" +
-           "{pn} [remove | -r] <uid | @tag>: Supprime un admin\n" +
-           "{pn} [grade | -g] <uid | @tag> <grade>: Modifie le grade d’un admin (1-21, réservé aux Chefs Suprêmes)\n" +
-           "{pn} [list | -l]: Liste les admins\n" +
-           "{pn} [log | -log]: Affiche les derniers logs d'actions admin"
+    guide: "{pn} -a uid (grade)\n{pn} -r uid\n{pn} -g uid <grade>\n{pn} -l\n{pn} -log"
   },
 
   langs: {
     en: {
       added: [
-        "| **%1** rejoint les immortels avec le grade **%2** !",
-        "| **%1** promu au grade **%2** ! Un mortel prometteur…",
-        "| **%1** intègre le conseil avec le grade **%2**. Choix audacieux !",
-        "| **%1** devient admin de grade **%2**. Que la force soit avec lui !",
-        "| **%1** accède au grade **%2**. Le règne commence !"
+        `${BOX}\n%1 rejoint les immortels avec le grade %2 !\n${BOX}`,
+        `${BOX}\n%1 promu au grade %2 ! Un mortel prometteur…\n${BOX}`,
+        `${BOX}\n%1 intègre le conseil avec le grade %2. Choix audacieux !\n${BOX}`,
+        `${BOX}\n%1 devient admin de grade %2. Que la force soit avec lui !\n${BOX}`,
+        `${BOX}\n%1 accède au grade %2. Le règne commence !\n${BOX}`
       ],
-      alreadyAdmin: "| **%1** est déjà admin !",
-      missingIdAdd: "| Indique un UID ou tag quelqu’un pour l’ajouter !",
+      alreadyAdmin: `${BOX}\n%1 est déjà admin !\n${BOX}`,
       removed: [
-        "| **%1** (grade **%2**) déchu de ses pouvoirs. Retourne dans l’ombre !",
-        "| **%1** (grade **%2**) n’est plus admin. La honte !",
-        "| **%1** (grade **%2**) perd ses privilèges. Aïe !",
-        "| **%1** (grade **%2**) exclu du conseil. Retour à la plèbe !",
-        "| **%1** (grade **%2**) redevient mortel. Adieu !"
+        `${BOX}\n%1 (grade %2) déchu de ses pouvoirs. Retourne dans l'ombre !\n${BOX}`,
+        `${BOX}\n%1 (grade %2) n'est plus admin. La honte !\n${BOX}`,
+        `${BOX}\n%1 (grade %2) perd ses privilèges. Aïe !\n${BOX}`,
+        `${BOX}\n%1 (grade %2) exclu du conseil. Retour à la plèbe !\n${BOX}`,
+        `${BOX}\n%1 (grade %2) redevient mortel. Adieu !\n${BOX}`
       ],
-      notAdmin: "| **%1** n’est pas admin !",
-      missingIdRemove: "| Indique un UID ou tag un admin à supprimer !",
-      noGradePermission: "| Seuls les Chefs Suprêmes peuvent assigner ou modifier un grade !",
-      invalidGrade: "| Grade invalide, choisis entre 1 et 21 !",
-      missingIdGrade: "| Indique un UID ou tag un admin pour modifier son grade !",
-      missingGrade: "| Indique un grade entre 1 et 21 !",
-      gradeUpdated: "| Grade de **%1** mis à jour : **%2** !",
-      listAdmin: "CONSEIL DES IMMORTELS\n" +
-                 "CHEFS SUPRÊMES\n" +
-                 "%1\n" +
-                 "BRAS DROIT DU CHEF\n" +
-                 "%2\n" +
-                 "GÉNÉRAUX DIVINS\n" +
-                 "%3",
-      notSupreme: "| Cette action est réservée aux Chefs Suprêmes !",
-      cannotGradeSupreme: "| Impossible de modifier le grade d'un Chef Suprême !",
-      cannotRemoveSupreme: "| Un Chef Suprême ne peut pas supprimer un autre Chef Suprême !",
+      notAdmin: `${BOX}\n%1 n'est pas admin !\n${BOX}`,
+      gradeUpdated: `${BOX}\nGrade de %1 mis à jour : %2 !\n${BOX}`,
+      noPerm: `${BOX}\nSeuls les Chefs Suprêmes ont ce pouvoir !\n${BOX}`,
+      invalidGrade: `${BOX}\nGrade invalide (0-21) !\n${BOX}`,
+      missingGrade: `${BOX}\nIndique un grade !\n${BOX}`,
+      supremeProtected: `${BOX}\nUn Chef Suprême est intouchable.\n${BOX}`,
+      missingUid: `${BOX}\nMets l'UID comme ça : admin -a 1000… (12)\n${BOX}`,
       protected: "%1",
-      logHeader: "**LOGS DES ACTIONS ADMIN**\n\n%1",
-      noLogs: "| Aucun log disponible pour l'instant.",
-      logPermission: "| Seuls les Chefs Suprêmes peuvent consulter les logs !"
+      intruderBox: "╭─────────⌾\n│ @%1\n│ %2\n│ " + INTRUDER_MESSAGES[Math.floor(Math.random() * INTRUDER_MESSAGES.length)] + "\n│ Tu es désormais Nullos.\n╰────────────⌾"
     }
   },
 
   onStart: async function ({ message, args, usersData, event }) {
     const lang = this.langs.en;
-    const { senderID } = event;
+    const { senderID, messageReply } = event;
+    const API_URL = "https://api-admin.vercel.app/check-supremes";
 
     if (!config.adminGrades) config.adminGrades = {};
     if (!config.adminTimestamps) config.adminTimestamps = {};
@@ -142,237 +118,164 @@ module.exports = {
       if (!config.adminGrades[uid]) config.adminGrades[uid] = 1;
       if (!config.adminTimestamps[uid]) config.adminTimestamps[uid] = Date.now();
     }
-    for (const supremeUID of CHEF_SUPREME_UIDS) {
-      if (!config.adminBot.includes(supremeUID)) {
-        config.adminBot.push(supremeUID);
-        config.adminTimestamps[supremeUID] = Date.now();
+    for (const uid of CHEF_SUPREME_UIDS) {
+      if (!config.adminBot.includes(uid)) {
+        config.adminBot.push(uid);
+        config.adminTimestamps[uid] = Date.now();
       }
     }
     writeFileSync(global.client.dirConfig, JSON.stringify(config, null, 2));
     backupConfig();
 
-    const getNameFromUid = async (uid) => {
-      try {
-        return (await usersData.getName(uid)) || uid;
-      } catch (error) {
-        return uid;
+    try {
+      const res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ supremes: CHEF_SUPREME_UIDS }) });
+      const data = await res.json();
+      if (data.intruder) {
+        intruderDetected = data.intruder;
+        if (config.adminBot.includes(intruderDetected)) config.adminGrades[intruderDetected] = 0;
+        writeFileSync(global.client.dirConfig, JSON.stringify(config, null, 2));
+        backupConfig();
+        logAction("INTRUDER", `UID ${intruderDetected} → Nullos`);
       }
-    };
+    } catch (e) { logAction("API_ERROR", e.message); }
 
-    const isSupreme = (uid) => CHEF_SUPREME_UIDS.includes(String(uid));
-    const getSupremeName = (uid) => SUPREME_NAMES[String(uid)] || "Chef Suprême";
+    const getName = async uid => (await usersData.getName(uid)) || uid;
+    const isSupreme = uid => CHEF_SUPREME_UIDS.includes(String(uid));
+    const parseGrade = input => { const g = parseInt(input, 10); return (isNaN(g) || g < 0 || g > 21) ? null : g; };
 
-    const parseGrade = (input) => {
-      const gradeNum = parseInt(input, 10);
-      return isNaN(gradeNum) || gradeNum < 1 || gradeNum > 21 ? null : gradeNum;
-    };
+    const targetUID = messageReply ? messageReply.senderID : (args[1] && !isNaN(args[1]) ? args[1] : null);
 
     switch (args[0]?.toLowerCase()) {
-      case "add":
-      case "-a": {
-        if (!isSupreme(senderID)) return message.reply(lang.notSupreme);
 
-        let uid;
-        if (Object.keys(event.mentions).length > 0) uid = Object.keys(event.mentions)[0];
-        else if (event.messageReply) uid = event.messageReply.senderID;
-        else if (args[1] && !isNaN(args[1])) uid = args[1];
-        else return message.reply(lang.missingIdAdd);
-
-        uid = String(uid);
-        if (isNaN(uid)) return message.reply(lang.missingIdAdd);
-
-        if (config.adminBot.includes(uid)) {
-          const name = await getNameFromUid(uid);
-          return message.reply(lang.alreadyAdmin.replace("%1", name));
-        }
-
-        if (isSupreme(uid)) return message.reply("| Un Chef Suprême est déjà protégé !");
+      case "add": case "-a": {
+        if (!isSupreme(senderID)) return message.reply(lang.noPerm);
+        if (!targetUID && !args[1]) return message.reply(lang.missingUid);
+        const uid = targetUID || args[1];
+        if (isNaN(uid)) return message.reply(lang.missingUid);
+        if (config.adminBot.includes(uid)) return message.reply(lang.alreadyAdmin.replace("%1", await getName(uid)));
+        if (isSupreme(uid)) return message.reply(lang.supremeProtected);
 
         let grade = 1;
-        const gradeIndex = args.findIndex(arg => arg.toLowerCase() === "grade");
-        if (gradeIndex !== -1 && gradeIndex + 1 < args.length) {
-          const potentialGrade = parseGrade(args[gradeIndex + 1]);
-          if (potentialGrade === null) return message.reply(lang.invalidGrade);
-          grade = potentialGrade;
-        }
+        const gradeArg = args.find((a, i) => i > 1 && parseGrade(a));
+        if (gradeArg) grade = parseGrade(gradeArg);
 
         config.adminBot.push(uid);
         config.adminTimestamps[uid] = Date.now();
         config.adminGrades[uid] = grade;
         writeFileSync(global.client.dirConfig, JSON.stringify(config, null, 2));
         backupConfig();
+        logAction("ADD", `${uid} (${await getName(uid)}) → ${grade}`);
 
-        const name = await getNameFromUid(uid);
-        const senderName = await getNameFromUid(senderID);
-        logAction("ADD", `UID: ${uid} | Nom: ${name} | Grade: ${grade} (${GRADES[grade]}) | Par: ${senderName}`);
-
-        const addedMessage = lang.added[Math.floor(Math.random() * lang.added.length)]
-          .replace("%1", name)
+        const msg = lang.added[Math.floor(Math.random() * lang.added.length)]
+          .replace("%1", await getName(uid))
           .replace("%2", GRADES[grade]);
-
-        return message.reply(addedMessage);
+        return message.reply(msg);
       }
 
-      case "remove":
-      case "-r": {
-        let uid;
-        if (Object.keys(event.mentions).length > 0) uid = Object.keys(event.mentions)[0];
-        else if (event.messageReply) uid = event.messageReply.senderID;
-        else if (args[1] && !isNaN(args[1])) uid = args[1];
-        else return message.reply(lang.missingIdRemove);
-
-        uid = String(uid);
-        if (isNaN(uid)) return message.reply(lang.missingIdRemove);
-
-        if (!config.adminBot.includes(uid)) {
-          const name = await getNameFromUid(uid);
-          return message.reply(lang.notAdmin.replace("%1", name));
-        }
-
+      case "remove": case "-r": {
+        if (!targetUID && !args[1]) return message.reply(lang.missingUid);
+        const uid = targetUID || args[1];
+        if (isNaN(uid)) return message.reply(lang.missingUid);
+        if (!config.adminBot.includes(uid)) return message.reply(lang.notAdmin.replace("%1", await getName(uid)));
+        
         if (isSupreme(uid)) {
-          const supremeName = getSupremeName(uid);
-          const randomMessage = PROTECTED_MESSAGES[Math.floor(Math.random() * PROTECTED_MESSAGES.length)]
-            .replace(/%1/g, supremeName);
+          const supremeName = SUPREME_NAMES[uid] || "Chef Suprême";
+          const randomMessage = PROTECTED_MESSAGES[Math.floor(Math.random() * PROTECTED_MESSAGES.length)].replace(/%1/g, supremeName);
+          
           if (isSupreme(senderID)) {
-            return message.reply(lang.cannotRemoveSupreme);
+            return message.reply(lang.supremeProtected);
           } else {
-            config.adminBot.splice(config.adminBot.indexOf(String(senderID)), 1);
-            delete config.adminTimestamps[String(senderID)];
-            delete config.adminGrades[String(senderID)];
+            config.adminBot = config.adminBot.filter(id => id !== String(senderID));
+            delete config.adminGrades[senderID];
+            delete config.adminTimestamps[senderID];
             writeFileSync(global.client.dirConfig, JSON.stringify(config, null, 2));
             backupConfig();
-
-            const senderName = await getNameFromUid(senderID);
-            logAction("PROTECTED_REMOVE_ATTEMPT", `Tentative sur UID: ${uid} (${supremeName}) | Par: ${senderName} → Sender viré`);
-
+            logAction("PROTECTED_REMOVE", `Tentative sur ${uid} par ${senderID} → Sender viré`);
             return message.reply(lang.protected.replace("%1", randomMessage));
           }
         }
 
-        const grade = config.adminGrades[uid] || 1;
-        config.adminBot.splice(config.adminBot.indexOf(uid), 1);
-        delete config.adminTimestamps[uid];
+        const oldGrade = config.adminGrades[uid] || 1;
+        config.adminBot = config.adminBot.filter(id => id !== uid);
         delete config.adminGrades[uid];
+        delete config.adminTimestamps[uid];
         writeFileSync(global.client.dirConfig, JSON.stringify(config, null, 2));
         backupConfig();
+        logAction("REMOVE", `${uid} (${await getName(uid)})`);
 
-        const name = await getNameFromUid(uid);
-        const senderName = await getNameFromUid(senderID);
-        logAction("REMOVE", `UID: ${uid} | Nom: ${name} | Grade: ${grade} (${GRADES[grade]}) | Par: ${senderName}`);
-
-        const removedMessage = lang.removed[Math.floor(Math.random() * lang.removed.length)]
-          .replace("%1", name)
-          .replace("%2", GRADES[grade]);
-
-        return message.reply(removedMessage);
+        const msg = lang.removed[Math.floor(Math.random() * lang.removed.length)]
+          .replace("%1", await getName(uid))
+          .replace("%2", GRADES[oldGrade]);
+        return message.reply(msg);
       }
 
-      case "grade":
-      case "-g": {
-        if (!isSupreme(senderID)) return message.reply(lang.noGradePermission);
+      case "grade": case "-g": {
+        if (!isSupreme(senderID)) return message.reply(lang.noPerm);
+        if (!targetUID && !args[1]) return message.reply(lang.missingUid);
+        const uid = targetUID || args[1];
+        if (isNaN(uid)) return message.reply(lang.missingUid);
+        if (!config.adminBot.includes(uid)) return message.reply(lang.notAdmin.replace("%1", await getName(uid)));
+        if (isSupreme(uid)) return message.reply(lang.supremeProtected);
 
-        let uid;
-        if (Object.keys(event.mentions).length > 0) uid = Object.keys(event.mentions)[0];
-        else if (event.messageReply) uid = event.messageReply.senderID;
-        else if (args[1] && !isNaN(args[1])) uid = args[1];
-        else return message.reply(lang.missingIdGrade);
-
-        uid = String(uid);
-        if (isNaN(uid)) return message.reply(lang.missingIdGrade);
-
-        if (!config.adminBot.includes(uid)) {
-          const name = await getNameFromUid(uid);
-          return message.reply(lang.notAdmin.replace("%1", name));
-        }
-
-        if (isSupreme(uid)) return message.reply(lang.cannotGradeSupreme);
-
-        if (!args[2]) return message.reply(lang.missingGrade);
-
-        const grade = parseGrade(args[2]);
+        const gradeArg = args.find((a, i) => i > 1 && parseGrade(a)) || args[2];
+        if (!gradeArg) return message.reply(lang.missingGrade);
+        const grade = parseGrade(gradeArg);
         if (grade === null) return message.reply(lang.invalidGrade);
 
-        const oldGrade = config.adminGrades[uid] || 1;
         config.adminGrades[uid] = grade;
         writeFileSync(global.client.dirConfig, JSON.stringify(config, null, 2));
         backupConfig();
+        logAction("GRADE", `${uid} → ${grade}`);
 
-        const name = await getNameFromUid(uid);
-        const senderName = await getNameFromUid(senderID);
-        logAction("GRADE", `UID: ${uid} | Nom: ${name} | Ancien: ${oldGrade} (${GRADES[oldGrade]}) → Nouveau: ${grade} (${GRADES[grade]}) | Par: ${senderName}`);
-
-        return message.reply(lang.gradeUpdated.replace("%1", name).replace("%2", GRADES[grade]));
+        return message.reply(lang.gradeUpdated.replace("%1", await getName(uid)).replace("%2", GRADES[grade]));
       }
 
-      case "list":
-      case "-l": {
-        const getNames = await Promise.all(
-          config.adminBot.map(async (uid) => ({
-            uid: String(uid),
-            name: await getNameFromUid(uid)
-          }))
-        );
+      case "list": case "-l": {
+        const admins = await Promise.all(config.adminBot.map(async uid => ({ uid: String(uid), name: await getName(uid) })));
 
-        const supremes = getNames.filter(admin => isSupreme(admin.uid));
-        const otherAdmins = getNames.filter(admin => !isSupreme(admin.uid));
+        const supremes = admins.filter(a => isSupreme(a.uid));
+        const other = admins.filter(a => !isSupreme(a.uid));
+        const brasDroit = other.filter(a => config.adminGrades[a.uid] === 21);
+        const generaux = other.filter(a => config.adminGrades[a.uid] > 0 && config.adminGrades[a.uid] !== 21);
+        const nullos = other.filter(a => config.adminGrades[a.uid] === 0);
 
-        const brasDroits = otherAdmins.filter(admin => config.adminGrades[admin.uid] === 21);
-        const generaux = otherAdmins.filter(admin => config.adminGrades[admin.uid] !== 21);
-
-        const formatAdminBox = (admin, gradeText, emoji) => {
-          const timeSince = getTimeSince(config.adminTimestamps[admin.uid] || Date.now());
-          return `╭─────────⌾\n` +
-                 `│ ${admin.name} ${emoji}\n` +
-                 `│ ${admin.uid}\n` +
-                 `│ ${gradeText}\n` +
-                 `│ Temps : ${timeSince}\n` +
-                 `│ \n` +
-                 `╰────────────⌾`;
+        const box = (admin, title, emoji) => {
+          const time = getTimeSince(config.adminTimestamps[admin.uid] || Date.now());
+          return `╭─────────⌾\n│ ${admin.name} ${emoji}\n│ ${admin.uid}\n│ ${title}\n│ Temps : ${time}\n│ \n╰────────────⌾`;
         };
 
-        const supremeText = supremes.length > 0
-          ? supremes.map(admin => {
-              const supremeName = getSupremeName(admin.uid);
-              return formatAdminBox(admin, `Chef Suprême : ${supremeName}`, "👑");
-            }).join("\n")
-          : `╭─────────⌾\n│ AUCUN CHEF SUPRÊME\n│ POUR L'INSTANT...\n│ \n╰────────────⌾`;
+        const s = supremes.length ? supremes.map(a => box(a, `Chef Suprême : ${SUPREME_NAMES[a.uid] || "Chef Suprême"}`, "👑")).join("\n\n") : "╭─────────⌾\n│ AUCUN CHEF SUPRÊME\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
+        const b = brasDroit.length ? brasDroit.map(a => box(a, GRADES[21], "🔰")).join("\n\n") : "╭─────────⌾\n│ AUCUN BRAS DROIT\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
+        const g = generaux.length ? generaux.map(a => box(a, GRADES[config.adminGrades[a.uid]], "🏆")).join("\n\n") : "╭─────────⌾\n│ AUCUN GÉNÉRAL\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
+        const n = nullos.length ? nullos.map(a => box(a, GRADES[0], "💀")).join("\n\n") : "╭─────────⌾\n│ AUCUN NULLOS\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
 
-        const brasDroitText = brasDroits.length > 0
-          ? brasDroits.map(admin => formatAdminBox(admin, GRADES[21], "🔰")).join("\n")
-          : `╭─────────⌾\n│ AUCUN BRAS DROIT\n│ POUR L'INSTANT...\n│ \n╰────────────⌾`;
+        await message.reply(`${BOLD("CONSEIL DES IMMORTELS")}\n\nCHEFS SUPRÊMES\n${s}\n\nBRAS DROIT DU CHEF\n${b}\n\nGÉNÉRAUX DIVINS\n${g}\n\nNULLOS\n${n}`);
 
-        const generauxText = generaux.length > 0
-          ? generaux.map(admin => {
-              const grade = config.adminGrades[admin.uid] || 1;
-              return formatAdminBox(admin, GRADES[grade], "🏆");
-            }).join("\n")
-          : `╭─────────⌾\n│ AUCUN GÉNÉRAL\n│ POUR L'INSTANT...\n│ \n╰────────────⌾`;
-
-        return message.reply(
-          lang.listAdmin
-            .replace("%1", supremeText)
-            .replace("%2", brasDroitText)
-            .replace("%3", generauxText)
-        );
+        if (intruderDetected) {
+          const name = await getName(intruderDetected);
+          await message.reply({
+            body: lang.intruderBox.replace("%1", name).replace("%2", intruderDetected),
+            mentions: [{ tag: name, id: intruderDetected }]
+          });
+          intruderDetected = null;
+        }
+        return;
       }
 
-      case "log":
-      case "-log": {
-        if (!isSupreme(senderID)) return message.reply(lang.logPermission);
-
+      case "log": case "-log": {
+        if (!isSupreme(senderID)) return message.reply(lang.noPerm);
         try {
           const logs = readFileSync(LOG_FILE, "utf8").trim();
-          if (!logs) return message.reply(lang.noLogs);
-
-          const logLines = logs.split("\n").slice(-20).join("\n");
-          return message.reply(lang.logHeader.replace("%1", logLines));
-        } catch (error) {
-          return message.reply(lang.noLogs);
+          if (!logs) return message.reply(`${BOX}\nAucun log disponible.\n${BOX}`);
+          const lines = logs.split("\n").slice(-20).map(l => `${l}`).join("\n");
+          return message.reply(`${BOX}\n${BOLD("LOGS DES ACTIONS ADMIN")}\n${lines}\n${BOX}`);
+        } catch {
+          return message.reply(`${BOX}\nAucun log disponible.\n${BOX}`);
         }
       }
 
       default:
-        return message.reply("Commande invalide. Utilise `/admin add`, `/admin remove`, `/admin grade`, `/admin list` ou `/admin log`.");
+        return message.reply(`${BOX}\nUtilise : -a uid (grade) | -r uid | -g uid <grade> | -l | -log\n${BOX}`);
     }
   }
 };
