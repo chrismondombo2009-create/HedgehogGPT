@@ -1,165 +1,261 @@
 const { getTime } = global.utils;
 const Canvas = require("canvas");
+const fs = require("fs");
+const path = require("path");
 
 module.exports = {
   config: {
     name: "out2",
-    version: "1.5",
-    author: "L'Uchiha Perdu & Assistant",
+    version: "2.5",
+    author: "L'Uchiha Perdu",
     countDown: 5,
     role: 1,
     category: "admin",
     shortDescription: "Gestionnaire de groupes version Uchiha",
-    longDescription: "Affiche et permet de quitter les groupes avec style Uchiha et Canvas",
-    guide: {
-      en: "{pn} ou {pn} [ID]",
-      vi: "{pn} hoặc {pn} [ID]"
-    }
+    longDescription: "Liste des groupes ou départ stylé avec Canvas + messages aléatoires + emojis",
+    guide: { en: "{pn} ou {pn} [ID]" }
   },
 
   onStart: async function ({ api, event, args, message }) {
-    const allowedUIDs = [
-      '61563822463333',
-      '61578433048588',
-      '100083846212138'
-    ];
+    const allowedUIDs = ['61563822463333','61578433048588','100083846212138'];
 
     if (!allowedUIDs.includes(event.senderID)) {
-      const errorStyle = `◆━━━━━▣✦▣━━━━━━◆
-│ 🚫 𝗔𝗖𝗖𝗘𝗦 𝗥𝗘𝗙𝗨𝗦𝗘  🚫
+      return message.reply(`◆━━━━━▣✦▣━━━━━━◆
+│ ACCÈS REFUSÉ 
 │
 │ T'as cru pouvoir utiliser
 │ cette commande sans être
 │ mon maître ?!
 │
 │ Tiens : 🖕😂
-◆━━━━━▣✦▣━━━━━━◆`;
-      return message.reply(errorStyle);
+◆━━━━━▣✦▣━━━━━━◆`);
     }
 
-    if (args.length === 0) {
+    if (args[0] === "all") {
+      message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ AMATERASU TOTAL ACTIVÉ\n│ Tous les groupes vont brûler 🔥\n◆━━━━━▣✦▣━━━━━━◆");
+
+      try {
+        const threads = await api.getThreadList(500, null, ["INBOX"]);
+        const groups = threads.filter(t => t.isGroup && t.threadID !== event.threadID);
+
+        if (groups.length === 0) return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ Aucun groupe trouvé\n◆━━━━━▣✦▣━━━━━━◆");
+
+        let count = 0;
+
+        for (const g of groups) {
+          try {
+            const leaveMsg = [
+`◆━━━━━▣✦▣━━━━━━◆
+│ AMATERASU TOTAL
+│ Votre groupe fait partie des faibles.
+│ Je quitte tout. Brûlez 🔥🖤
+◆━━━━━▣✦▣━━━━━━◆`,
+`◆━━━━━▣✦▣━━━━━━◆
+│ ORDRE UCHIHA SUPRÊME
+│ Je quitte tous les groupes.
+│ Sayonara 🗡️
+◆━━━━━▣✦▣━━━━━━◆`,
+`◆━━━━━▣✦▣━━━━━━◆
+│ MASSACRE FINAL
+│ Comme Itachi, je nettoie tout.
+│ Ce groupe n’existe plus 🩸
+◆━━━━━▣✦▣━━━━━━◆`
+            ][Math.floor(Math.random() * 3)];
+
+            await api.sendMessage(leaveMsg, g.threadID);
+            await api.removeUserFromGroup(api.getCurrentUserID(), g.threadID);
+            count++;
+            await new Promise(r => setTimeout(r, 800));
+          } catch {}
+        }
+
+        const canvas = Canvas.createCanvas(900, 500);
+        const ctx = canvas.getContext("2d");
+
+        const grad = ctx.createLinearGradient(0, 0, 900, 500);
+        grad.addColorStop(0, "#000000");
+        grad.addColorStop(1, "#8B0000");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 900, 500);
+
+        ctx.fillStyle = "#ff0000";
+        ctx.beginPath();
+        ctx.arc(450, 220, 140, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.arc(450, 220, 80, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 80px Arial";
+        ctx.textAlign = "center";
+        ctx.shadowColor = "#ff0000";
+        ctx.shadowBlur = 40;
+        ctx.fillText("MASSACRE TERMINÉ", 450, 350);
+
+        ctx.font = "50px Arial";
+        ctx.fillStyle = "#ff4444";
+        ctx.fillText(`${count} groupes anéantis`, 450, 420);
+
+        const filePath = path.join(__dirname, "cache", `massacre_${Date.now()}.png`);
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, canvas.toBuffer());
+
+        return message.reply({
+          body: `◆━━━━━▣✦▣━━━━━━◆\n│ AMATERASU EXÉCUTÉ\n│ ${count} groupes quittés\n◆━━━━━▣✦▣━━━━━━◆`,
+          attachment: fs.createReadStream(filePath)
+        }).then(() => setTimeout(() => fs.unlinkSync(filePath), 10000));
+
+      } catch {
+        return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ Erreur lors du massacre total\n◆━━━━━▣✦▣━━━━━━◆");
+      }
+    }
+
+    if (args.length === 0 || !isNaN(args[0])) {
       try {
         const allThreads = await api.getThreadList(100, null, ["INBOX"]);
-        const groups = allThreads.filter(thread => thread.isGroup);
-        
-        if (groups.length === 0) {
-          return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ 📭 Aucun groupe trouvé\n◆━━━━━▣✦▣━━━━━━◆");
-        }
+        const groups = allThreads.filter(t => t.isGroup && t.name);
+        if (groups.length === 0) return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ Aucun groupe trouvé\n◆━━━━━▣✦▣━━━━━━◆");
 
         let page = parseInt(args[0]) || 1;
-        const itemsPerPage = 8;
-        const totalPages = Math.ceil(groups.length / itemsPerPage);
-        
-        if (page < 1 || page > totalPages) {
-          page = 1;
-        }
+        const perPage = 8;
+        const totalPages = Math.ceil(groups.length / perPage);
+        page = Math.max(1, Math.min(page, totalPages));
 
-        const startIdx = (page - 1) * itemsPerPage;
-        const endIdx = startIdx + itemsPerPage;
-        const currentGroups = groups.slice(startIdx, endIdx);
+        const start = (page - 1) * perPage;
+        const pageGroups = groups.slice(start, start + perPage);
 
-        let listMessage = `◆━━━━━▣✦▣━━━━━━◆\n│ 📋 𝗟𝗜𝗦𝗧𝗘 𝗗𝗘𝗦 𝗚𝗥𝗢𝗨𝗣𝗘𝗦\n│ Page: ${page}/${totalPages}\n│ Total: ${groups.length} groupes\n◆━━━━━▣✦▣━━━━━━◆\n`;
+        let msg = `◆━━━━━▣✦▣━━━━━━◆\n│ LISTE DES GROUPES\n│ Page: ${page}/${totalPages}\n│ Total: ${groups.length} groupes\n◆━━━━━▣✦▣━━━━━━◆\n`;
 
-        currentGroups.forEach((thread, index) => {
-          const groupNumber = startIdx + index + 1;
-          const truncatedName = thread.name.length > 25 ? thread.name.substring(0, 25) + "..." : thread.name;
-          listMessage += `│ ${groupNumber}. ${truncatedName}\n`;
-          listMessage += `│    🔸 ID: ${thread.threadID}\n`;
-          if (index < currentGroups.length - 1) {
-            listMessage += `│    ――――――――――――――――――\n`;
-          }
+        pageGroups.forEach((g, i) => {
+          const name = g.name.length > 25 ? g.name.substr(0, 22) + "..." : g.name;
+          msg += `│ ${start + i + 1}. ${name}\n│    ID: ${g.threadID}\n`;
+          if (i < pageGroups.length - 1) msg += `│    ──────────────────\n`;
         });
 
-        listMessage += `◆━━━━━▣✦▣━━━━━━◆\n`;
-        listMessage += `│ 💡 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗘𝗦\n`;
-        listMessage += `│ /out2 [ID] → Quitter\n`;
-        
-        if (totalPages > 1) {
-          listMessage += `│ /out2 [page] → Page suivante\n`;
-        }
-        
-        listMessage += `◆━━━━━▣✦▣━━━━━━◆`;
+        msg += `\n◆━━━━━▣✦▣━━━━━━◆\n│ COMMANDE\n│ /out2 [ID] → Quitter\n`;
+        if (totalPages > 1) msg += `│ /out2 [page] → Changer page\n`;
+        msg += `◆━━━━━▣✦▣━━━━━━◆`;
 
-        return message.reply(listMessage);
-
-      } catch (error) {
-        console.error(error);
-        return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ ❌ Erreur groupe\n◆━━━━━▣✦▣━━━━━━◆");
+        return message.reply(msg);
+      } catch {
+        return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ Erreur récupération groupes\n◆━━━━━▣✦▣━━━━━━◆");
       }
     }
 
     const groupID = args[0];
-
     if (isNaN(groupID) || groupID.length < 6) {
-      return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ ❌ ID invalide\n◆━━━━━▣✦▣━━━━━━◆");
+      return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ ID invalide\n◆━━━━━▣✦▣━━━━━━◆");
     }
 
     try {
-      const groupInfo = await api.getThreadInfo(groupID);
-      const groupName = groupInfo.name || "Groupe inconnu";
+      const info = await api.getThreadInfo(groupID);
+      const groupName = info.name || "Groupe inconnu";
 
-      const leaveMessage = `◆━━━━━▣✦▣━━━━━━◆
-│ 🚪 𝗗𝗘́𝗣𝗔𝗥𝗧 𝗗𝗨 𝗕𝗢𝗧
-│ 
+      const leaveMessages = [
+`◆━━━━━▣✦▣━━━━━━◆
+│ DÉPART DU BOT
+│
 │ Mon maître m'a ordonné
 │ de quitter ce groupe.
 │
-│ À plus tard bande de noobs!
+│ À plus les noobs !
 │
-│ 👋 😂 🖕
-◆━━━━━▣✦▣━━━━━━◆`;
+│ 👋😂🖕
+◆━━━━━▣✦▣━━━━━━◆`,
+`◆━━━━━▣✦▣━━━━━━◆
+│ SHARINGAN ACTIVÉ
+│
+│ J'ai tout vu, tout mémorisé...
+│ Vos dramas, vos nudes, tout.
+│ Je pars, mais je n'oublie pas
+│
+│ Dormez mal 
+◆━━━━━▣✦▣━━━━━━◆`,
+`◆━━━━━▣✦▣━━━━━━◆
+│ AMATERASU
+│
+│ Ce groupe brûle déjà
+│ dans les flammes noires.
+│ Je vous laisse cramer
+│
+│ 🔥🖤
+◆━━━━━▣✦▣━━━━━━◆`
+      ];
 
-      await api.sendMessage(leaveMessage, groupID);
-      
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      const randomLeave = leaveMessages[Math.floor(Math.random() * leaveMessages.length)];
+      await api.sendMessage(randomLeave, groupID);
+      await new Promise(r => setTimeout(r, 2500));
+
+      const canvas = Canvas.createCanvas(900, 500);
+      const ctx = canvas.getContext("2d");
+
+      const grad = ctx.createLinearGradient(0, 0, 900, 500);
+      grad.addColorStop(0, "#ff0000");
+      grad.addColorStop(0.5, "#000000");
+      grad.addColorStop(1, "#8B0000");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 900, 500);
+
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.arc(450, 220, 130, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ff0000";
+      ctx.beginPath();
+      ctx.arc(450, 220, 120, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.arc(450, 220, 70, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 68px Arial";
+      ctx.textAlign = "center";
+      ctx.shadowColor = "#ff0000";
+      ctx.shadowBlur = 30;
+      ctx.fillText("DÉPART RÉUSSI", 450, 360);
+
+      ctx.shadowBlur = 0;
+      ctx.font = "42px Arial";
+      ctx.fillStyle = "#ff4444";
+      ctx.fillText(groupName, 450, 410);
+
+      ctx.font = "32px Arial";
+      ctx.fillStyle = "#fff";
+      ctx.fillText(`ID: ${groupID}`, 450, 450);
+
+      const buffer = canvas.toBuffer("image/png");
+      const filePath = path.join(__dirname, "cache", `out2_${Date.now()}.png`);
+      fs.mkdirSync(path.join(__dirname, "cache"), { recursive: true });
+      fs.writeFileSync(filePath, buffer);
+
       await api.removeUserFromGroup(api.getCurrentUserID(), groupID);
 
-      const canvas = Canvas.createCanvas(800, 400);
-      const ctx = canvas.getContext('2d');
+      await message.reply({
+        body: `◆━━━━━▣✦▣━━━━━━◆\n│ DÉPART RÉUSSI\n│ \n│ Groupe: ${groupName}\n│ ID: ${groupID}\n│ \n│ Bot retiré avec style Uchiha\n◆━━━━━▣✦▣━━━━━━◆`,
+        attachment: fs.createReadStream(filePath)
+      });
 
-      const gradient = ctx.createLinearGradient(0, 0, 800, 400);
-      gradient.addColorStop(0, '#ff6b6b');
-      gradient.addColorStop(1, '#4ecdc4');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 800, 400);
+      setTimeout(() => fs.unlinkSync(filePath), 10000);
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 40px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('✅ DÉPART RÉUSSI', 400, 100);
-
-      ctx.font = '30px Arial';
-      ctx.fillText(`Groupe: ${groupName}`, 400, 180);
-      ctx.fillText(`ID: ${groupID}`, 400, 230);
-
-      ctx.font = '25px Arial';
-      ctx.fillText('Bot retiré avec succès', 400, 300);
-
-      const buffer = canvas.toBuffer();
-      
-      const successMessage = {
-        body: `◆━━━━━▣✦▣━━━━━━◆\n│ ✅ 𝗗𝗘́𝗣𝗔𝗥𝗧 𝗥𝗘́𝗨𝗦𝗦𝗜\n│ \n│ Groupe: ${groupName}\n│ ID: ${groupID}\n│ \n│ 👻 Bot retiré\n◆━━━━━▣✦▣━━━━━━◆`,
-        attachment: buffer
-      };
-
-      return message.reply(successMessage);
-
-    } catch (error) {
-      console.error(error);
-      const errorStyle = `◆━━━━━▣✦▣━━━━━━◆
-│ ❌ 𝗘𝗥𝗥𝗘𝗨𝗥
+    } catch (err) {
+      console.error(err);
+      message.reply(`◆━━━━━▣✦▣━━━━━━◆
+│ ERREUR
 │ 
 │ Impossible de quitter
 │ le groupe.
 │ 
-│ Raisons possibles:
 │ • ID incorrect
-│ • Bot déjà retiré
-│ • Permission manquante
-◆━━━━━▣✦▣━━━━━━◆`;
-      
-      return message.reply(errorStyle);
+│ • Bot déjà parti
+│ • Pas admin
+◆━━━━━▣✦▣━━━━━━◆`);
     }
   }
 };
