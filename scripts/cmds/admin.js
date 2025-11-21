@@ -42,9 +42,7 @@ const PROTECTED_MESSAGES = [
   "%1 est éternel. Toi, pas tant que ça !"
 ];
 
-const BOX = "≪━─━─━─◈─━─━─━≫";
-const BOLD = str => str.split("").map(c => String.fromCharCode(c.charCodeAt(0) + 127439)).join("");
-
+const BOX = "≪─≪─≪─◈─≪─≪─≫";
 const LOG_FILE = path.join(__dirname, "admin_logs.txt");
 const BACKUP_INTERVAL = 10 * 60 * 1000;
 let lastBackupTime = 0;
@@ -67,7 +65,7 @@ function backupConfig() {
 module.exports = {
   config: {
     name: "admin",
-    version: "7.0",
+    version: "7.1",
     author: "L'Uchiha Perdu & Sømå Sønïč",
     countDown: 5,
     role: 2,
@@ -80,18 +78,13 @@ module.exports = {
     en: {
       added: [
         `${BOX}\n%1 rejoint les immortels avec le grade %2 !\n${BOX}`,
-        `${BOX}\n%1 promu au grade %2 ! Un mortel prometteur…\n${BOX}`,
-        `${BOX}\n%1 intègre le conseil avec le grade %2. Choix audacieux !\n${BOX}`,
-        `${BOX}\n%1 devient admin de grade %2. Que la force soit avec lui !\n${BOX}`,
+        `${BOX}\n%1 promu au grade %2 !\n${BOX}`,
         `${BOX}\n%1 accède au grade %2. Le règne commence !\n${BOX}`
       ],
       alreadyAdmin: `${BOX}\n%1 est déjà admin !\n${BOX}`,
       removed: [
         `${BOX}\n%1 (grade %2) déchu de ses pouvoirs. Retourne dans l'ombre !\n${BOX}`,
-        `${BOX}\n%1 (grade %2) n'est plus admin. La honte !\n${BOX}`,
-        `${BOX}\n%1 (grade %2) perd ses privilèges. Aïe !\n${BOX}`,
-        `${BOX}\n%1 (grade %2) exclu du conseil. Retour à la plèbe !\n${BOX}`,
-        `${BOX}\n%1 (grade %2) redevient mortel. Adieu !\n${BOX}`
+        `${BOX}\n%1 (grade %2) n'est plus admin.\n${BOX}`
       ],
       notAdmin: `${BOX}\n%1 n'est pas admin !\n${BOX}`,
       gradeUpdated: `${BOX}\nGrade de %1 mis à jour : %2 !\n${BOX}`,
@@ -182,9 +175,8 @@ module.exports = {
           const supremeName = SUPREME_NAMES[uid] || "Chef Suprême";
           const randomMessage = PROTECTED_MESSAGES[Math.floor(Math.random() * PROTECTED_MESSAGES.length)].replace(/%1/g, supremeName);
           
-          if (isSupreme(senderID)) {
-            return message.reply(lang.supremeProtected);
-          } else {
+          if (isSupreme(senderID)) return message.reply(lang.supremeProtected);
+          else {
             config.adminBot = config.adminBot.filter(id => id !== String(senderID));
             delete config.adminGrades[senderID];
             delete config.adminTimestamps[senderID];
@@ -241,15 +233,15 @@ module.exports = {
 
         const box = (admin, title, emoji) => {
           const time = getTimeSince(config.adminTimestamps[admin.uid] || Date.now());
-          return `╭─────────⌾\n│ ${admin.name} ${emoji}\n│ ${admin.uid}\n│ ${title}\n│ Temps : ${time}\n│ \n╰────────────⌾`;
+          return `╭─────────⌾\n│ ${admin.name} ${emoji}\n│ ${admin.uid}\n│ ${title}\n│ Temps : ${time}\n╰────────────⌾`;
         };
 
-        const s = supremes.length ? supremes.map(a => box(a, `Chef Suprême : ${SUPREME_NAMES[a.uid] || "Chef Suprême"}`, "👑")).join("\n\n") : "╭─────────⌾\n│ AUCUN CHEF SUPRÊME\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
-        const b = brasDroit.length ? brasDroit.map(a => box(a, GRADES[21], "🔰")).join("\n\n") : "╭─────────⌾\n│ AUCUN BRAS DROIT\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
-        const g = generaux.length ? generaux.map(a => box(a, GRADES[config.adminGrades[a.uid]], "🏆")).join("\n\n") : "╭─────────⌾\n│ AUCUN GÉNÉRAL\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
-        const n = nullos.length ? nullos.map(a => box(a, GRADES[0], "💀")).join("\n\n") : "╭─────────⌾\n│ AUCUN NULLOS\n│ POUR L'INSTANT...\n│ \n╰────────────⌾";
+        const s = supremes.length ? supremes.map(a => box(a, `Chef Suprême : ${SUPREME_NAMES[a.uid] || "Chef Suprême"}`, "👑")).join("\n\n") : "╭─────────⌾\n│ AUCUN CHEF SUPRÊME\n╰────────────⌾";
+        const b = brasDroit.length ? brasDroit.map(a => box(a, GRADES[21], "🔰")).join("\n\n") : "╭─────────⌾\n│ AUCUN BRAS DROIT\n╰────────────⌾";
+        const g = generaux.length ? generaux.map(a => box(a, GRADES[config.adminGrades[a.uid]], "🏆")).join("\n\n") : "╭─────────⌾\n│ AUCUN GÉNÉRAL\n╰────────────⌾";
+        const n = nullos.length ? nullos.map(a => box(a, GRADES[0], "💀")).join("\n\n") : "╭─────────⌾\n│ AUCUN NULLOS\n╰────────────⌾";
 
-        await message.reply(`${BOLD("CONSEIL DES IMMORTELS")}\n\nCHEFS SUPRÊMES\n${s}\n\nBRAS DROIT DU CHEF\n${b}\n\nGÉNÉRAUX DIVINS\n${g}\n\nNULLOS\n${n}`);
+        await message.reply(`CONSEIL DES IMMORTELS\n\nCHEFS SUPRÊMES\n${s}\n\nBRAS DROIT DU CHEF\n${b}\n\nGÉNÉRAUX DIVINS\n${g}\n\nNULLOS\n${n}`);
 
         if (intruderDetected) {
           const name = await getName(intruderDetected);
@@ -268,7 +260,7 @@ module.exports = {
           const logs = readFileSync(LOG_FILE, "utf8").trim();
           if (!logs) return message.reply(`${BOX}\nAucun log disponible.\n${BOX}`);
           const lines = logs.split("\n").slice(-20).map(l => `${l}`).join("\n");
-          return message.reply(`${BOX}\n${BOLD("LOGS DES ACTIONS ADMIN")}\n${lines}\n${BOX}`);
+          return message.reply(`${BOX}\nLOGS DES ACTIONS ADMIN\n${lines}\n${BOX}`);
         } catch {
           return message.reply(`${BOX}\nAucun log disponible.\n${BOX}`);
         }
