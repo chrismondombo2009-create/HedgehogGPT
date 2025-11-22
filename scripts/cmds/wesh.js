@@ -51,7 +51,7 @@ async function apiPost(url, data, headers = {}, retries = 3) {
 module.exports = {
   config: {
     name: 'uchiha-storm',
-    version: '5.3.0',
+    version: '5.4.0',
     author: 'L\'Uchiha Perdu',
     countDown: 5,
     role: 0,
@@ -198,7 +198,7 @@ module.exports = {
 
       if (args[1] === 'start' && args[2]) {
         try {
-          const res = await apiPost(`${API_URL}/tournament/start`, { tournamentID: args[2], uid: 'x-api-key' }, { 'x-api-key': API_KEY });
+          const res = await apiPost(`${API_URL}/tournament/start`, { tournamentID: args[2] }, { 'x-api-key': API_KEY });
           const brackets = res.data.brackets;
           let msg = 'Tournoi démarré !\n\nBrackets :\n';
           brackets.forEach((b, i) => {
