@@ -548,17 +548,20 @@ async function handleAction(event, api, state, stateFile, isRiposte, threadID, m
   while (retries > 0) {
     try {
       res = await apiPost(`${API_URL}/combat`, {
-        player1: state.players.player1,
-        player2: state.players.player2,
-        char1: state.characters.player1,
-        char2: state.characters.player2,
-        stats: state.stats,
-        history: state.history,
-        action,
-        isRiposte,
-        privilegedUID: senderID
-      }, { 'x-api-key': API_KEY });
-      break;
+  player1: state.players.player1,
+  player2: state.players.player2,
+  char1: state.characters.player1,
+  char2: state.characters.player2,
+  stats: state.stats,
+  history: state.history,
+  action,
+  isRiposte,
+  privilegedUID: senderID,
+  isAI: state.isAI,
+  currentTurn: state.currentTurn,
+  aiDifficulty: state.aiDifficulty
+}, { 'x-api-key': API_KEY });    
+  break;
     } catch (err) {
       retries--;
       if (retries === 0) {
