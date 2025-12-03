@@ -15,13 +15,12 @@ module.exports = {
     category: "game",
     countDown: 1,
     role: 0,
-    author: "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝐗𝐄 3.0★彡"
+    author: "ʚʆɞ Sømå Sønïč ʚʆɞ"
   },
   onStart: async function({ args, message, event, api, usersData }) {
     const { getPrefix } = global.utils;
     const p = getPrefix(event.threadID);
 
-    // --- ensure bank.json exists + load ---
     if (!fs.existsSync(BANK_FILE)) {
       fs.writeFileSync(BANK_FILE, JSON.stringify({}, null, 2));
     }
@@ -33,7 +32,7 @@ module.exports = {
       fs.writeFileSync(BANK_FILE, JSON.stringify(bankData, null, 2));
     }
 
-    // helpers
+   
     function saveBank() {
       try {
         fs.writeFileSync(BANK_FILE, JSON.stringify(bankData, null, 2));
@@ -183,9 +182,6 @@ module.exports = {
         );
       }
 
-      // -------------------------
-      // WITHDRAW
-      // -------------------------
       case "withdraw": {
         const withdrawPassword = args[1];
         const withdrawAmount = parseInt(args[2]);
@@ -244,9 +240,6 @@ module.exports = {
         );
       }
 
-      // -------------------------
-      // HIGH RISK INVEST
-      // -------------------------
       case "hrinvest": {
         const investmentAmount = parseInt(args[1]);
 
@@ -291,9 +284,6 @@ module.exports = {
         }
       }
 
-      // -------------------------
-      // GAMBLE (VIP only)
-      // -------------------------
       case "gamble": {
         // Vérifie VIP
         if (bankData[user].bank >= 100000000000 && bankData[user].role !== "VIP") {
@@ -354,9 +344,6 @@ module.exports = {
         }
       }
 
-      // -------------------------
-      // HEIST (simple)
-      // -------------------------
       case "heist": {
         const heistSuccessChance = 0.2;
         const heistWinAmount = 1000;
@@ -728,9 +715,6 @@ module.exports = {
         );
       }
 
-      // -------------------------
-      // LOTTERY (buy / draw)
-      // -------------------------
       case "lottery": {
         const sub = args[1]?.toLowerCase();
         if (sub === "buy") {
@@ -776,9 +760,6 @@ module.exports = {
         }
       }
 
-      // -------------------------
-      // INSURE (buy insurance)
-      // -------------------------
       case "insure":
       case "insurance": {
         // buy insurance
@@ -799,9 +780,6 @@ module.exports = {
         }
       }
 
-      // -------------------------
-      // ROB (steal from another player)
-      // -------------------------
       case "rob": {
         const targetId = parseInt(args[1]);
         if (!targetId || targetId === user) {
@@ -843,9 +821,6 @@ module.exports = {
         }
       }
 
-      // -------------------------
-      // VAULT (coffre-fort)
-      // -------------------------
       case "vault": {
         const sub = args[1]?.toLowerCase();
         if (sub === "deposit") {
@@ -873,9 +848,6 @@ module.exports = {
         }
       }
 
-      // -------------------------
-      // STAKE / BOND (lock investment)
-      // -------------------------
       case "bond":
       case "stake": {
         const sub = args[1]?.toLowerCase();
@@ -919,9 +891,6 @@ module.exports = {
         return;
       }
 
-      // -------------------------
-      // DAILY
-      // -------------------------
       case "daily": {
         const last = bankData[user].dailyClaim || 0;
         if (Date.now() - last < 1000 * 60 * 60 * 24) {
@@ -940,9 +909,6 @@ module.exports = {
         return message.reply(`🎁 You collected your daily: ${reward}$`);
       }
 
-      // -------------------------
-      // HISTORY
-      // -------------------------
       case "history": {
         const hist = bankData[user].history || [];
         if (!hist.length) return message.reply("No history yet.");
@@ -951,9 +917,6 @@ module.exports = {
         return message.reply("📜 Last transactions:\n" + lines.join("\n"));
       }
 
-      // -------------------------
-      // STATS (advanced)
-      // -------------------------
       case "stats": {
         // show user stats or global if admin arg
         if (args[1] && args[1].toLowerCase() === "global") {
@@ -976,9 +939,6 @@ module.exports = {
         }
       }
 
-      // -------------------------
-      // TOP-UP (admin adjust) -> admin only? We keep for compatibility but comment
-      // -------------------------
       case "adminadjust":
       case "admin": {
         // caution: leave as-is but restrict to bot owner ideally. For now require VIP to run.
@@ -995,14 +955,11 @@ module.exports = {
         return message.reply("Admin commands: set [uid] [amount]");
       }
 
-      // -------------------------
-      // TOP-LEVEL HELP / DEFAULT
-      // -------------------------
       default: {
         return message.reply(
           `==[🏦 𝐔𝐂𝐇𝐈𝐖𝐀 𝐁𝐀𝐍𝐊 🏦]==\n━━━━━━━━━━━━━━━\n📲| 𝙿𝚕𝚎𝚊𝚜𝚎 𝚞𝚜𝚎 𝚘𝚗𝚎 𝚘𝚏 𝚝𝚑𝚎 𝚏𝚘𝚕𝚕𝚘𝚠𝚒𝚗𝚐 𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚜✧\n✰ ${p}𝐁𝐚𝐧𝐤 𝐃𝐞𝐩𝐨𝐬𝐢𝐭\n✰ ${p}𝐁𝐚𝐧𝐤 𝐖𝐢𝐭𝐡𝐝𝐫𝐚𝐰\n✰ ${p}𝐁𝐚𝐧𝐤 𝐒𝐡𝐨𝐰\n✰ ${p}𝐁𝐚𝐧𝐤 𝐈𝐧𝐭𝐞𝐫𝐞𝐬𝐭\n✰ ${p}𝐁𝐚𝐧𝐤 𝐓𝐫𝐚𝐧𝐬𝐟𝐞𝐫\n✰ ${p}𝐁𝐚𝐧𝐤 𝐓𝐨𝐩\n✰ ${p}𝐁𝐚𝐧𝐤 𝐋𝐨𝐚𝐧\n✰ ${p}𝐁𝐚𝐧𝐤 𝐏𝐚𝐲𝐥𝐨𝐚𝐧\n✰ ${p}𝐁𝐚𝐧𝐤 𝐇𝐫𝐢𝐧𝐯𝐞𝐬𝐭\n✰ ${p}𝐁𝐚𝐧𝐤 𝐆𝐚𝐦𝐛𝐥𝐞\n✰ ${p}𝐁𝐚𝐧𝐤 𝐇𝐞𝐢𝐬𝐭\n✰ ${p}𝐁𝐚𝐧𝐤 𝐁𝐚𝐥𝐚𝐧𝐜𝐞\n✰ ${p}𝐁𝐚𝐧𝐤 𝐕𝐈𝐏\n✰ ${p}𝐁𝐚𝐧𝐤 𝗟𝗼𝘁𝘁𝗲𝗿𝘆\n✰ ${p}𝐁𝐚𝐧𝐤 𝗜𝗻𝘀𝘂𝗿𝗲\n✰ ${p}𝐁𝐚𝐧𝐤 𝗥𝗼𝗯\n✰ ${p}𝐁𝐚𝐧𝐤 𝗩𝗮𝘂𝗹𝘁\n✰ ${p}𝐁𝐚𝐧𝐤 𝗕𝗼𝗻𝗱\n✰ ${p}𝐁𝐚𝐧𝐤 𝗗𝗮𝗶𝗹𝘆\n✰ ${p}𝐁𝐚𝐧𝐤 𝗛𝗶𝘀𝘁𝗼𝗿𝘆\n✰ ${p}𝐁𝐚𝐧𝐤 𝗦𝘁𝗮𝘁𝘀\n━━━━━━━━━━━━━━━━\n ===[🏦 𝗣𝗔𝗦𝗦𝗪𝗢𝗥𝗗 🏦]===\n✧𝙿𝚕𝚎𝚊𝚜𝚎 𝚊𝚍𝚍 𝚙𝚊𝚜𝚜𝚠𝚘𝚛𝚍 𝚏𝚘𝚛 𝚜𝚎𝚌𝚞𝚛𝚎 𝚊𝚌𝚌𝚘𝚞𝚗𝚝✧\n✰ ${p}𝗕𝗮𝗻𝗸 𝘀𝗲𝘁𝗽𝗮𝘀𝘀𝘄𝗼𝗿𝗱\n✰ ${p}𝗕𝗮𝗻𝗸 𝗰𝗵𝗮𝗻𝗴𝗲𝗽𝗮𝘀𝘀𝘄𝗼𝗿𝗱\n✰ ${p}𝗕𝗮𝗻𝗸 𝗿𝗲𝗺𝗼𝘃𝗲𝗽𝗮𝘀𝘀𝘄𝗼𝗿𝗱\n━━━━━━━━━━━━━━━━`
         );
       }
-    } // end switch
-  } // end onStart
-}; // end module
+    } 
+  } 
+};
