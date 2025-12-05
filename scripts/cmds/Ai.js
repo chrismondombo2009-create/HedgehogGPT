@@ -1,70 +1,39 @@
-~cmd install ai.js const axios = require("axios");
-
 module.exports = {
   config: {
     name: "ai",
     aliases: ["gpt", "chatgpt", "gpt5"],
     version: "2.5",
-    author: "Aryan Chauhan",
-    countDown: 5,
+    author: "L'Uchiha Perdu",
+    countDown: 0,
     role: 0,
-    shortDescription: { en: "Chat with GPT-5" },
-    longDescription: { en: "Talk with GPT-5 AI" },
-    category: "ai",
-    guide: { en: "!ai <msg> | !ai reset" }
+    shortDescription: "Chat with GPT-5",
+    longDescription: "Talk with GPT-5 AI",
+    category: "AI",
+    guide: "Ai <message>"
   },
 
   onStart: async ({ api, event, args }) => {
-    const q = args.join(" ");
-    if (!q) return b(api, event, "⚠ Provide a message.");
-    if (q.toLowerCase() === "reset") return c(api, event);
-    a(api, event, q, false);
-  },
-
-  onReply: async ({ api, event, Reply }) => {
-    if (event.senderID !== Reply.author) return;
-    const q = event.body;
-    if (!q) return;
-    if (q.toLowerCase() === "reset") return c(api, event);
-    a(api, event, q, false);
+    const user = await getUserName(api, event.senderID);
+    const q = args.join(" ").trim();
+    if (!q) return api.sendMessage(`${user} utilise le prefix Sonic pour discuter avec l'IA.`, event.threadID, event.messageID);
+    return api.sendMessage(`❌ Impossible d’utiliser l’IA ici. Utilise le prefix Sonic.`, event.threadID, event.messageID);
   },
 
   onChat: async ({ api, event }) => {
-    const m = (event.body || "").match(/^(ai|gpt|chatgpt|gpt5)\s+(.+)/i);
+    const body = (event.body || "").trim();
+    const m = body.match(/^(ai)\s*(.*)/i);
     if (!m) return;
-    const q = m[2].trim();
-    if (!q) return;
-    if (q.toLowerCase() === "reset") return c(api, event);
-    a(api, event, q, false);
+    const user = await getUserName(api, event.senderID);
+    if (!m[2] || m[2].trim() === "") return api.sendMessage(`${user} utilise le prefix Sonic pour discuter avec l'IA.`, event.threadID, event.messageID);
+    return api.sendMessage(`❌ Impossible d’utiliser l’IA ici. Utilise le prefix Sonic.`, event.threadID, event.messageID);
   }
 };
 
-async function a(api, event, q, r) {
+async function getUserName(api, userID) {
   try {
-    const res = await axios.get("https://aryanapi.up.railway.app/api/gpt5", { params: { prompt: q, uid: event.senderID, reset: r ? "true" : "false" } });
-    const ans = res.data?.result?.trim();
-    if (!ans) return b(api, event, "❌ No response.");
-
-    // Répondre après un délai de 3 secondes
-    setTimeout(() => {
-      api.sendMessage(ans, event.threadID, (err, info) => {
-        if (err) return;
-        global.GoatBot.onReply.set(info.messageID, { commandName: "ai", author: event.senderID });
-      }, event.messageID);
-    }, 3000); // Délai de 3000 millisecondes (3 secondes)
-
+    const info = await api.getUserInfo(userID);
+    return info[userID]?.name || "Utilisateur";
   } catch {
-    b(api, event, "❌ Error from AI.");
-  }
-}
-
-function b(api, event, t) { return api.sendMessage(t, event.threadID, event.messageID); }
-
-async function c(api, event) {
-  try {
-    await axios.get("https://aryanapi.up.railway.app/api/gpt5", { params: { prompt: "reset", uid: event.senderID, reset: "true" } });
-    b(api, event, "✅ Memory reset!");
-  } catch {
-    b(api, event, "❌ Reset failed.");
+    return "Utilisateur";
   }
 }
