@@ -49,7 +49,7 @@ module.exports = {
         
         await new Promise((resolve, reject) => {
           api.sendMessage({
-            body: "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
+            body: "",
             attachment: fs.createReadStream(filePath)
           }, event.threadID, (err, info) => {
             if (err) return reject(err);
