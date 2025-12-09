@@ -92,9 +92,9 @@ handlerCheckData.cantCreateUser=Users with id '%1' cannot be written to the data
 handlerEvents.userBanned=You have been banned from using the bot\n» Reason: %1\n» Time: %2\n» User ID: %3
 handlerEvents.threadBanned=This group has been banned from using the bot\n» Reason: %1\n» Time: %2\n» Thread ID: %3
 handlerEvents.onlyAdminBox=This group is currently enabled only group administrators can use the bot
-handlerEvents.onlyAdminBot=❌ | 𝐎𝐧𝐥𝐲 ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝐗𝐄 3.0★彡 𝐚𝐧𝐝 𝐨𝐭𝐡𝐞𝐫 𝐎𝐰𝐧𝐞𝐫 𝐜𝐚𝐧 𝐮𝐬𝐞 𝐭𝐡𝐞 𝐛𝐨𝐭 𝐧𝐨𝐰 ಠ⁠_⁠ಠ
+handlerEvents.onlyAdminBot=❌ | 𝐎𝐧𝐥𝐲 ʚʆɞ Sømå Sønïč ʚʆɞ, L'Uchiha Perdu 𝐚𝐧𝐝 𝐨𝐭𝐡𝐞𝐫 𝐎𝐰𝐧𝐞𝐫 𝐜𝐚𝐧 𝐮𝐬𝐞 𝐭𝐡𝐞 𝐛𝐨𝐭 𝐧𝐨𝐰 ಠ⁠_⁠ಠ
 handlerEvents.commandNotFound=Command "%1" does not exist, type %2help to see all available commands
-handlerEvents.commandNotFound2=🪄ᏰᎧᏖ ᎧᏇᏁᏋᏒ🪄\n─────⊱◈☘️◈⊰─────\nʚʆɞ Gūɱbāllʚʆɞ\nミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝐗𝐄 3.0★彡\n─────⊱◈☘️◈⊰─────\n🔗fᎪᏟᎬᏰᎾᎾᏦ ᏝᎥᏁᏦ🔗\n─────⊱◈☘️◈⊰─────\https://www.facebook.com/profile.php?id=61582101006304\nhttps://facebook.com/sonic.san.1492\n─────⊱◈☘️◈⊰─────\n👨‍💻ᎶᎥᏖᏂᏬᏰ ᏝᎥᏁᏦ👨‍💻\nhttps://github.com/Sonic-Shisui/Hedgehog-Bot-V2\n─────⊱◈☘️◈⊰─────\n🦔| ᏂᏋᎴᎶᏋᏂᎧᎶ ᏰᎧᏖ:\n➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ
+handlerEvents.commandNotFound2=🪄ᏰᎧᏖ ᎧᏇᏁᏋᏒ🪄\n─────⊱◈☘️◈⊰─────\nʚʆɞ Gūɱbāll ʚʆɞ\nʚʆɞ Sømå Sønïč ʚʆɞ\nL'Uchiha Perdu\n─────⊱◈☘️◈⊰─────\n🔗fᎪᏟᎬᏰᎾᎾᏦ ᏝᎥᏁᏦ🔗\n─────⊱◈☘️◈⊰─────\https://www.facebook.com/profile.php?id=61582101006304\nhttps://facebook.com/sonic.san.1492\nhttps://www.facebook.com/walter.o.brien.529139\n─────⊱◈☘️◈⊰─────\n👨‍💻ᎶᎥᏖᏂᏬᏰ ᏝᎥᏁᏦ👨‍💻\nhttps://github.com/Sonic-Shisui/Hedgehog-Bot-V2\n─────⊱◈☘️◈⊰─────\n🦔| ᏂᏋᎴᎶᏋᏂᎧᎶ ᏰᎧᏖ:\n➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ
 handlerEvents.commandSyntaxError=🤔| 𝐈𝐧𝐜𝐨𝐫𝐫𝐞𝐜𝐭 𝐬𝐲𝐧𝐭𝐚𝐱...𝐩𝐥𝐞𝐚𝐬𝐞 𝐮𝐬𝐞 %1𝐡𝐞𝐥𝐩 %2 𝐭𝐨 𝐬𝐞𝐞 𝐚𝐥𝐥 𝐝𝐞𝐭𝐚𝐢𝐥𝐬 𝐨𝐫 𝐜𝐨𝐧𝐭𝐚𝐜𝐭 𝐦𝐲 𝐨𝐰𝐧𝐞𝐫
 handlerEvents.onlyAdmin=❌ | Only group administrators can use the command "%1"
 handlerEvents.onlyAdminToUseOnReply=❌ | Only group administrators can use the reply function of the command "%1"
