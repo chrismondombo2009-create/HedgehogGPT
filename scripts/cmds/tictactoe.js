@@ -4,7 +4,7 @@ const { createCanvas, loadImage } = require('canvas');
 
 const STATS_FILE = path.join(__dirname, 'tictactoe_stats.json');
 const ASSETS_DIR = path.join(__dirname, 'tictactoe_assets');
-const BOT_UID = "61579341020538";
+const BOT_UID = "61584915780524";
 const BOT_NAME = "Hedgehog GPT";
 
 let games = {};
