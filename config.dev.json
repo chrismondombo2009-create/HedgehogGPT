@@ -20,12 +20,16 @@
     "61578433048588",
     "61582101006304",
     "61574402177230",
-    "61563822463333",
     "100083846212138"
   ],
   "whiteListMode": {
     "enable": false,
-    "whiteListIds": [],
+    "whiteListIds": [
+      "61578433048588",
+      "61582101006304",
+      "61574402177230",
+      "100083846212138"
+    ],
     "notes": "if you enable this feature, only the ids in the whiteListIds section can use the bot"
   },
   "nickNameBot": "➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ",
@@ -38,17 +42,17 @@
     "notes": "(1) type selects 'json' or 'sqlite' or 'mongodb'. If you choose mongodb, enter uri connect mongodb in the uriMongodb section, instructions to get uri connect mongodb at: https://youtu.be/z1f9urHW5xY. I recommend using 'mongodb' or 'sqlite', json is not recommended because it is not stable. (2) when you set autoSyncWhenStart to true, the bot will automatically synchronize the data in the database when starting the bot, this will make the bot start slower. (3) when you set autoRefreshThreadInfoFirstTime to true, the bot will automatically refresh the thread information when get first message from the thread since starting the bot"
   },
   "timeZone": "Asia/Dhaka",
-    "credentials": {
+  "credentials": {
     "gmailAccount": {
       "email": "romeobot555@gmail.com",
-      "clientId": "938512788954-ndaggmsbqkf0a6ougkc7p0iek446ikt1.apps.googleusercontent.com",
-      "clientSecret": "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",
-      "refreshToken": "1//046ZXiqfQpbF1CgYIARAAGAQSNwF-L9Ir8uPenmtD9Co8psKc7goPgaxSfYG_TJreIbnB1mKgwC0vKP9t4Ir-kxjf-YMNGd124TQ",
+      "clientId": "695328982889-v1t85ej9aq1fvv0n4alp7rcbea9gkgvf.apps.googleusercontent.com",
+      "clientSecret": "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",
+      "refreshToken": "1//04EyH1gbNUVv5CgYIARAAGAQSNwF-L9IrqcPCQD2QsuhCQ2XprHCTMrTnVPI6WvT9i73nnoi4XqfAD0_yDoGW_gtWUdIeVtANzao",
       "apiKey": ""
     },
     "gRecaptcha": {
-      "siteKey": "6LfH6HQrAAAAACmNc3LTiJFLiUvMpFblCUqj6pd1",
-      "secretKey": "6LfH6HQrAAAAAEhnFm96bt-CeDuXcAGDFKeWPVEq"
+      "siteKey": "6Lff7Y0mAAAAALiv3IBkCCOfCdEsN-lK-jtR5FCm",
+      "secretKey": "6Lff7Y0mAAAAAGQr8dO3lqDJVhTi8Q-tpLLy2kGo"
     }
   },
   "dashBoard": {
