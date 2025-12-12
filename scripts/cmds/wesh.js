@@ -554,12 +554,15 @@ module.exports = {
       const isP1 = senderID === state.players.player1.uid;
       try {
         const res = await apiPost(`${API_URL}/character`, { character: char }, { 'x-api-key': API_KEY });
-        let charData = extractJSON(res.data) || res.data;
-        if (!charData?.valid) {
+        let charData = res.data;
+        
+        if (!charData || charData.valid === false) {
           state.processing = false;
           await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
-          return message.reply(formatMessage(`Personnage invalide, suggestion: ${charData.suggested_char || 'réessayez.'}`));
+          const suggestion = charData?.suggested_char ? `, suggestion: ${charData.suggested_char}` : '';
+          return message.reply(formatMessage(`Personnage invalide${suggestion}`));
         }
+        
         if (isP1) {
             state.characters.player1 = char;
             state.charInfo.player1 = charData;
@@ -572,7 +575,7 @@ module.exports = {
         await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
         
         if (isP1 && state.isAI) {
-          await generateIaCharacter(state, stateFile, message, userData.name, threadID);
+          await generateIaCharacter(state, stateFile, message, senderName, threadID);
         } else if (isP1) {
           await message.reply(formatMessage(`Joueur 1 a choisi ${char} !\n\nJoueur 2 (${state.players.player2.name}), choisissez votre personnage.`));
         } else {
@@ -616,14 +619,22 @@ module.exports = {
 
 async function generateIaCharacter(state, stateFile, message, senderName, threadID) {
   try {
-    const res = await apiPost(`${API_URL}/character`, { character: 'generate_for_ai', opponent_char: state.characters.player1, opponent_power_level: state.charInfo.player1.power_level, aiDifficulty: state.aiDifficulty }, { 'x-api-key': API_KEY });
-    let charData = extractJSON(res.data) || res.data;
+    const res = await apiPost(`${API_URL}/character`, { 
+      character: 'generate_for_ai', 
+      opponent_char: state.characters.player1, 
+      opponent_power_level: state.charInfo.player1?.power_level, 
+      aiDifficulty: state.aiDifficulty 
+    }, { 'x-api-key': API_KEY });
+    
+    let charData = res.data;
+    
     state.characters.player2 = charData.suggested_char;
     state.charInfo.player2 = charData;
     await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
     await message.reply(formatMessage(`L'IA a choisi ${charData.suggested_char} !\n\nLe combat commence ! À vous, ${senderName}.`));
     await initCombat(state, stateFile, message, threadID);
-  } catch {
+  } catch (error) {
+    console.error("Erreur génération IA:", error.message);
     state.status = 'idle';
     await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
     await message.reply(formatMessage(`Erreur génération IA.`));
@@ -633,8 +644,17 @@ async function generateIaCharacter(state, stateFile, message, senderName, thread
 async function initCombat(state, stateFile, message, threadID) {
   state.stats = { player1: initStats(state.charInfo.player1), player2: initStats(state.charInfo.player2) };
   try {
-    const preRes = await apiPost(`${API_URL}/pre-combat-check`, { char1: state.characters.player1, char2: state.characters.player2, info1: state.charInfo.player1, info2: state.charInfo.player2, player1_name: state.players.player1.name, player2_name: state.players.player2.name }, { 'x-api-key': API_KEY });
-    const preResult = extractJSON(preRes.data) || { decision: "normal_combat" };
+    const preRes = await apiPost(`${API_URL}/pre-combat-check`, { 
+      char1: state.characters.player1, 
+      char2: state.characters.player2, 
+      info1: state.charInfo.player1, 
+      info2: state.charInfo.player2, 
+      player1_name: state.players.player1.name, 
+      player2_name: state.players.player2.name 
+    }, { 'x-api-key': API_KEY });
+    
+    const preResult = preRes.data || { decision: "normal_combat" };
+    
     if (preResult.decision === "instant_one_shot") {
       const winnerName = state.players[preResult.winner].name;
       await message.reply(formatMessage(`${preResult.description}\n\nONE-SHOT INSTANTANÉ !\n${winnerName} anéantit l'adversaire !\nRaison : ${preResult.one_shot_reason}`));
@@ -650,7 +670,10 @@ async function initCombat(state, stateFile, message, threadID) {
       if (!tBackup) await fs.unlink(stateFile).catch(() => {});
       return;
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error("Erreur pre-combat-check:", err.message);
+  }
+  
   await message.reply(formatMessage(`Le combat commence ! À vous, ${state.players.player1.name}.`));
   state.status = 'combat';
   state.currentTurn = 'player1';
@@ -663,9 +686,24 @@ async function iaTurn(api, state, stateFile, threadID, message, usersData) {
   state.processing = true;
   await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
   try {
-    const res = await apiPost(`${API_URL}/combat`, { player1: state.players.player1, player2: state.players.player2, char1: state.characters.player1, char2: state.characters.player2, stats: state.stats, history: state.history, action: 'IA_TURN', isRiposte: false, privilegedUID: state.players.player1.uid, isAI: true, currentTurn: 'player2', aiDifficulty: state.aiDifficulty }, { 'x-api-key': API_KEY });
+    const res = await apiPost(`${API_URL}/combat`, { 
+      player1: state.players.player1, 
+      player2: state.players.player2, 
+      char1: state.characters.player1, 
+      char2: state.characters.player2, 
+      stats: state.stats, 
+      history: state.history, 
+      action: 'IA_TURN', 
+      isRiposte: false, 
+      privilegedUID: state.players.player1.uid, 
+      isAI: true, 
+      currentTurn: 'player2', 
+      aiDifficulty: state.aiDifficulty 
+    }, { 'x-api-key': API_KEY });
+    
     const result = res.data;
     if (result.decision === 'ignore_message') return;
+    
     state.stats = result.stats || state.stats;
     state.history.push({ action: `IA: ${result.taunt || 'Action IA'}`, result });
     const pv1 = state.stats.player1?.pv ?? 100;
@@ -687,9 +725,12 @@ async function iaTurn(api, state, stateFile, threadID, message, usersData) {
       state.status = 'idle';
       return;
     }
+    
     state.status = result.decision === 'attente_riposte' ? 'riposte' : 'combat';
     state.currentTurn = 'player1';
     await message.reply(formatMessage(`À vous maintenant !`));
+  } catch (error) {
+    console.error("Erreur iaTurn:", error.message);
   } finally {
     if (state.status !== 'idle') {
         state.processing = false;
@@ -708,9 +749,24 @@ async function handleAction(event, api, state, stateFile, isRiposte, threadID, m
   const action = body.trim();
   let retries = 3;
   let res;
+  
   while (retries > 0) {
     try {
-      res = await apiPost(`${API_URL}/combat`, { player1: state.players.player1, player2: state.players.player2, char1: state.characters.player1, char2: state.characters.player2, stats: state.stats, history: state.history, action, isRiposte, privilegedUID: senderID, isAI: state.isAI, currentTurn: state.currentTurn, aiDifficulty: state.aiDifficulty }, { 'x-api-key': API_KEY });    
+      res = await apiPost(`${API_URL}/combat`, { 
+        player1: state.players.player1, 
+        player2: state.players.player2, 
+        char1: state.characters.player1, 
+        char2: state.characters.player2, 
+        stats: state.stats, 
+        history: state.history, 
+        action, 
+        isRiposte, 
+        privilegedUID: senderID, 
+        isAI: state.isAI, 
+        currentTurn: state.currentTurn, 
+        aiDifficulty: state.aiDifficulty 
+      }, { 'x-api-key': API_KEY });
+      
       break;
     } catch (err) {
       retries--;
@@ -771,45 +827,63 @@ async function handleAction(event, api, state, stateFile, isRiposte, threadID, m
 }
 
 async function processTournamentMatchEnd(state, winnerName, winnerUID, threadID, message, usersData, stateFile) {
-    const upRes = await apiPost(`${API_URL}/tournament/update`, { tournamentID: state.tournament.id, matchID: state.tournament.currentMatchID, winnerUID: winnerUID }, { 'x-api-key': API_KEY });
+  try {
+    const upRes = await apiPost(`${API_URL}/tournament/update`, { 
+      tournamentID: state.tournament.id, 
+      matchID: state.tournament.currentMatchID, 
+      winnerUID: winnerUID 
+    }, { 'x-api-key': API_KEY });
     
     const nextTournamentState = {
-        active: true,
-        id: state.tournament.id,
-        matches: upRes.data.brackets,
-        round: upRes.data.round,
-        readyStatus: {},
-        currentMatchID: null
+      active: true,
+      id: state.tournament.id,
+      matches: upRes.data.brackets,
+      round: upRes.data.round,
+      readyStatus: {},
+      currentMatchID: null
     };
 
     if (upRes.data.status === 'finished') {
-         await message.reply(formatMessage(`🎉 LE TOURNOI EST TERMINÉ !\nLE GRAND VAINQUEUR EST : ${winnerName.toUpperCase()} !`));
-         state = getInitialState(); 
-         await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
-         await fs.unlink(stateFile).catch(() => {});
+      await message.reply(formatMessage(`🎉 LE TOURNOI EST TERMINÉ !\nLE GRAND VAINQUEUR EST : ${winnerName.toUpperCase()} !`));
+      state = getInitialState(); 
+      await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
+      await fs.unlink(stateFile).catch(() => {});
     } else if (upRes.data.status === 'next_round') {
-         const bracketImage = await drawBracket(nextTournamentState.matches, nextTournamentState.round, usersData);
-         await message.reply({ 
-             body: formatMessage(`TOUS LES MATCHS SONT FINIS !\nLancement du ROUND ${nextTournamentState.round} !\n\nSurvivants, envoyez "prêt" !`), 
-             attachment: bracketImage 
-         });
-         state = getInitialState();
-         state.tournament = nextTournamentState;
-         state.status = 'tournament_lobby';
-         await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
+      const bracketImage = await drawBracket(nextTournamentState.matches, nextTournamentState.round, usersData);
+      await message.reply({ 
+        body: formatMessage(`TOUS LES MATCHS SONT FINIS !\nLancement du ROUND ${nextTournamentState.round} !\n\nSurvivants, envoyez "prêt" !`), 
+        attachment: bracketImage 
+      });
+      state = getInitialState();
+      state.tournament = nextTournamentState;
+      state.status = 'tournament_lobby';
+      await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
     } else {
-         const bracketImage = await drawBracket(upRes.data.brackets, state.tournament.round, usersData);
-         await message.reply({ body: formatMessage(`Match terminé ! En attente des autres combats...`), attachment: bracketImage });
-         state = getInitialState();
-         state.tournament = nextTournamentState; 
-         state.tournament.readyStatus = state.tournament.readyStatus || {}; 
-         state.status = 'tournament_lobby';
-         await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
+      const bracketImage = await drawBracket(upRes.data.brackets, state.tournament.round, usersData);
+      await message.reply({ body: formatMessage(`Match terminé ! En attente des autres combats...`), attachment: bracketImage });
+      state = getInitialState();
+      state.tournament = nextTournamentState; 
+      state.tournament.readyStatus = state.tournament.readyStatus || {}; 
+      state.status = 'tournament_lobby';
+      await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
     }
+  } catch (error) {
+    console.error("Erreur tournament update:", error.message);
+  }
 }
 
 async function saveCombat(state, winner, threadID) {
   try {
-    await apiPost(`${API_URL}/save-combat`, { threadID, players: state.players, characters: state.characters, charInfo: state.charInfo, history: state.history, winner, status: 'finished' }, { 'x-api-key': API_KEY });
-  } catch (err) {}
+    await apiPost(`${API_URL}/save-combat`, { 
+      threadID, 
+      players: state.players, 
+      characters: state.characters, 
+      charInfo: state.charInfo, 
+      history: state.history, 
+      winner, 
+      status: 'finished' 
+    }, { 'x-api-key': API_KEY });
+  } catch (err) {
+    console.error("Erreur save-combat:", err.message);
+  }
 }
