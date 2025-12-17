@@ -1,6 +1,17 @@
 const fetch = require('node-fetch');
+const fs = require('fs-extra');
+const path = require('path');
+const { createCanvas, loadImage } = require('canvas');
+
+const STATS_FILE = path.join(__dirname, 'dames_stats.json');
+const ASSETS_DIR = path.join(__dirname, 'dames_assets');
+const BOT_UID = "61584915780524";
+const BOT_NAME = "Hedgehog GPT";
 
 const damierGames = {};
+const tournaments = {};
+const imageModeByThread = {};
+const playerCache = new Map();
 
 const EMPTY = "🟩";
 const PION_B = "⚪";
@@ -8,9 +19,34 @@ const PION_N = "⚫";
 const DAME_B = "🔵";
 const DAME_N = "🔴";
 
-const playerStats = {};
+const DAMES_API_URL = "https://dames-api.vercel.app";
 
-const DAMES_API_URL = "https://dames-api.vercel.app/"; // this API is critial, don't change credit
+if (!fs.existsSync(ASSETS_DIR)) {
+  fs.mkdirSync(ASSETS_DIR, { recursive: true });
+}
+
+function loadStats() {
+  try {
+    if (fs.existsSync(STATS_FILE)) {
+      return JSON.parse(fs.readFileSync(STATS_FILE, 'utf8') || '{}');
+    }
+  } catch (e) {
+    return {};
+  }
+  return {};
+}
+
+let playerStats = loadStats();
+
+function saveStats() {
+  try {
+    fs.writeFileSync(STATS_FILE, JSON.stringify(playerStats, null, 2));
+  } catch (e) {}
+}
+
+function ensurePlayerStats(id) {
+  if (!playerStats[id]) playerStats[id] = { wins: 0, losses: 0, draws: 0, played: 0 };
+}
 
 function createDamierBoard() {
   const board = Array.from({ length: 8 }, () => Array(8).fill(EMPTY));
@@ -43,8 +79,13 @@ function parseDamierMove(move) {
   const regex = /^([a-h][1-8])\s+([a-h][1-8])$/i;
   const match = move.match(regex);
   if (!match) return null;
-  const pos = (p) => [8 - Number(p[1]), p.charCodeAt(0) - 97];
-  return [pos(match[1].toLowerCase()), pos(match[2].toLowerCase())];
+  const pos = (p) => {
+    p = p.toLowerCase();
+    const file = p.charCodeAt(0) - 97; // a->0
+    const rank = Number(p[1]); // '1'..'8'
+    return [8 - rank, file];
+  };
+  return [pos(match[1]), pos(match[2])];
 }
 
 function isInside(x, y) {
@@ -59,34 +100,36 @@ function isValidMoveDamier(board, from, to, player) {
   const [fx, fy] = from, [tx, ty] = to;
   if (!isInside(fx, fy) || !isInside(tx, ty)) return false;
   const piece = board[fx][fy];
-  if (board[tx][ty] !== EMPTY) return false;
+  if (!piece || board[tx][ty] !== EMPTY) return false;
 
-  // Pion blanc
+  // PION BLANC (monte vers le haut : fx decreases)
   if (piece === PION_B) {
-    if (fx - tx === 1 && Math.abs(ty - fy) === 1) return true; // avance simple
+    if (fx - tx === 1 && Math.abs(ty - fy) === 1) return true;
     if (fx - tx === 2 && Math.abs(ty - fy) === 2) {
       const midX = fx - 1;
       const midY = fy + (ty - fy) / 2;
+      if (!Number.isInteger(midY)) return false;
       if (board[midX][midY] === PION_N || board[midX][midY] === DAME_N) return "prise";
     }
   }
-  // Pion noir
+  // PION NOIR (descend : tx greater)
   if (piece === PION_N) {
     if (tx - fx === 1 && Math.abs(ty - fy) === 1) return true;
     if (tx - fx === 2 && Math.abs(ty - fy) === 2) {
       const midX = fx + 1;
       const midY = fy + (ty - fy) / 2;
+      if (!Number.isInteger(midY)) return false;
       if (board[midX][midY] === PION_B || board[midX][midY] === DAME_B) return "prise";
     }
   }
-  // Dame blanche
+  // DAME BLANCHE
   if (piece === DAME_B) {
     if (Math.abs(fx - tx) === Math.abs(fy - ty)) {
       const dx = tx > fx ? 1 : -1, dy = ty > fy ? 1 : -1;
       let x = fx + dx, y = fy + dy, found = false;
       while (x !== tx && y !== ty) {
         if (board[x][y] === PION_N || board[x][y] === DAME_N) {
-          if (found) return false; // déjà un pion à prendre
+          if (found) return false;
           found = true;
         } else if (board[x][y] !== EMPTY) return false;
         x += dx; y += dy;
@@ -94,7 +137,7 @@ function isValidMoveDamier(board, from, to, player) {
       return found ? "prise" : true;
     }
   }
-  // Dame noire
+  // DAME NOIRE
   if (piece === DAME_N) {
     if (Math.abs(fx - tx) === Math.abs(fy - ty)) {
       const dx = tx > fx ? 1 : -1, dy = ty > fy ? 1 : -1;
@@ -119,7 +162,6 @@ function checkPromotion(board) {
   }
 }
 
-// Ancienne fonction getAllLegalMoves, renommée pour servir de fallback
 function getLocalLegalMoves(board, player) {
   const moves = [];
   const myPion = player === 0 ? PION_B : PION_N;
@@ -129,9 +171,9 @@ function getLocalLegalMoves(board, player) {
       if ([myPion, myDame].includes(board[fx][fy])) {
         for (let tx = 0; tx < 8; tx++) {
           for (let ty = 0; ty < 8; ty++) {
-            // Utilise isValidMoveDamier pour vérifier la validité locale
-            if ((fx !== tx || fy !== ty) && isValidMoveDamier(board, [fx, fy], [tx, ty], player === 0 ? "blanc" : "noir")) {
-              moves.push([[fx, fy], [tx, ty]]);
+            if ((fx !== tx || fy !== ty)) {
+              const valid = isValidMoveDamier(board, [fx, fy], [tx, ty], player === 0 ? "blanc" : "noir");
+              if (valid) moves.push([[fx, fy], [tx, ty]]);
             }
           }
         }
@@ -141,66 +183,326 @@ function getLocalLegalMoves(board, player) {
   return moves;
 }
 
-// Nouvelle fonction getAllLegalMoves qui utilise l'API avec un fallback
 async function getAllLegalMoves(board, player) {
-    const playerColor = player === 0 ? "blanc" : "noir"; // L'API pourrait attendre "blanc" ou "noir"
-    try {
-        const response = await fetch(`${DAMES_API_URL}/moves`, { // Supposons un endpoint /moves
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ board: board, player: playerColor })
-        });
-
-        if (!response.ok) {
-            // Si la réponse n'est pas OK (ex: 404, 500), lancer une erreur
-            throw new Error(`API Dames - Erreur HTTP: ${response.status} ${response.statusText}`);
-        }
-
-        const apiMoves = await response.json();
-
-        // Vérifier si la réponse de l'API est dans le format attendu
-        // L'API devrait retourner un tableau de coups, où chaque coup est [[fromX, fromY], [toX, toY]]
-        if (Array.isArray(apiMoves) && apiMoves.every(m =>
-            Array.isArray(m) && m.length === 2 &&
-            Array.isArray(m[0]) && m[0].length === 2 &&
-            Array.isArray(m[1]) && m[1].length === 2
-        )) {
-            return apiMoves; // Retourne les coups de l'API
-        } else {
-            console.error("API Dames - Format de réponse inattendu. Retour à la logique locale.");
-            return getLocalLegalMoves(board, player); // Fallback
-        }
-    } catch (error) {
-        console.error("API Dames - Échec de l'appel API:", error.message);
-        return getLocalLegalMoves(board, player); // Fallback en cas d'erreur réseau ou autre
+  const playerColor = player === 0 ? "blanc" : "noir";
+  try {
+    const response = await fetch(`${DAMES_API_URL}/moves`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board: board, player: playerColor })
+    });
+    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+    const apiMoves = await response.json();
+    if (Array.isArray(apiMoves) && apiMoves.every(m =>
+      Array.isArray(m) && m.length === 2 &&
+      Array.isArray(m[0]) && m[0].length === 2 &&
+      Array.isArray(m[1]) && m[1].length === 2
+    )) {
+      return apiMoves;
+    } else {
+      return getLocalLegalMoves(board, player);
     }
+  } catch (error) {
+    return getLocalLegalMoves(board, player);
+  }
 }
 
+async function getPlayerInfo(uid, usersData) {
+  if (uid === 'AI') {
+    try {
+      const avatarUrl = await usersData.getAvatarUrl(BOT_UID);
+      const avatar = await loadImage(avatarUrl);
+      return { avatar, name: BOT_NAME, uid: 'AI' };
+    } catch {
+      return { avatar: null, name: BOT_NAME, uid: 'AI' };
+    }
+  }
+  const numericUid = Number(uid);
+  if (isNaN(numericUid)) {
+    return { avatar: null, name: `Joueur ${uid}`, uid };
+  }
+  if (playerCache.has(numericUid)) return playerCache.get(numericUid);
+  try {
+    const avatarUrl = await usersData.getAvatarUrl(numericUid);
+    const avatar = avatarUrl ? await loadImage(avatarUrl) : null;
+    const name = (await usersData.getName(numericUid)) || `Joueur ${numericUid}`;
+    const info = { avatar, name, uid: numericUid };
+    playerCache.set(numericUid, info);
+    setTimeout(() => playerCache.delete(numericUid), 300000);
+    return info;
+  } catch (error) {
+    const info = { avatar: null, name: `Joueur ${numericUid}`, uid: numericUid };
+    playerCache.set(numericUid, info);
+    return info;
+  }
+}
 
-async function botPlay(game, api, threadID) {
+async function generateBoardImage(board, currentPlayer, players, usersData, gameType = "normal") {
+  try {
+    const canvasWidth = 1400;
+    const canvasHeight = 1200;
+    const canvas = createCanvas(canvasWidth, canvasHeight);
+    const ctx = canvas.getContext('2d');
+
+    const gradient = ctx.createLinearGradient(0, 0, canvasWidth, canvasHeight);
+    gradient.addColorStop(0, '#1a0a0a');
+    gradient.addColorStop(1, '#2a1a1e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    if (gameType === "tournament") {
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      ctx.font = 'bold 45px Arial';
+      ctx.fillStyle = '#FFD700';
+      ctx.textAlign = 'center';
+      ctx.fillText('◆━━━━━▣✦▣━━━━━━◆', canvasWidth/2, 60);
+      ctx.fillText('🏆 TOURNOI DAMES 🏆', canvasWidth/2, 120);
+      ctx.fillText('◆━━━━━▣✦▣━━━━━━◆', canvasWidth/2, 180);
+    }
+
+    const playerInfos = await Promise.all(players.map(p => getPlayerInfo(p.id, usersData)));
+
+    const boardSize = 640;
+    const cellSize = boardSize / 8;
+    const boardX = canvasWidth/2 - boardSize/2;
+    const boardY = 250;
+
+    for (let i = 0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        ctx.fillStyle = (i + j) % 2 === 0 ? '#e8d4b0' : '#8b4513';
+        ctx.fillRect(boardX + j * cellSize, boardY + i * cellSize, cellSize, cellSize);
+      }
+    }
+
+    ctx.font = 'bold 60px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let i = 0; i < 8; i++) {
+      for (let j = 0; j < 8; j++) {
+        const piece = board[i][j];
+        const x = boardX + j * cellSize + cellSize/2;
+        const y = boardY + i * cellSize + cellSize/2;
+        if (piece !== EMPTY) {
+          ctx.fillText(piece, x, y);
+        }
+      }
+    }
+
+    ctx.font = 'bold 28px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    for (let i = 0; i < 8; i++) {
+      ctx.fillText(String.fromCharCode(97 + i), boardX + i * cellSize + cellSize/2, boardY - 20);
+      ctx.fillText(8 - i, boardX - 30, boardY + i * cellSize + cellSize/2);
+    }
+
+    const avatarSize = 120;
+    const infoWidth = 350;
+
+    for (let i = 0; i < 2; i++) {
+      const player = playerInfos[i];
+      const playerData = players[i];
+      const isCurrent = currentPlayer && String(currentPlayer.id) === String(playerData.id);
+      const panelX = i === 0 ? 100 : canvasWidth - infoWidth - 100;
+      const panelY = 950;
+      const panelHeight = 200;
+      
+      ctx.fillStyle = isCurrent ? 'rgba(76, 201, 240, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+      ctx.fillRect(panelX, panelY, infoWidth, panelHeight);
+      ctx.strokeStyle = isCurrent ? '#4cc9f0' : 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(panelX, panelY, infoWidth, panelHeight);
+      
+      if (player.avatar) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(panelX + infoWidth/2, panelY + 60, avatarSize/2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(player.avatar, panelX + infoWidth/2 - avatarSize/2, panelY + 60 - avatarSize/2, avatarSize, avatarSize);
+        ctx.restore();
+        ctx.strokeStyle = playerData.color === 'blanc' ? '#FFFFFF' : '#000000';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(panelX + infoWidth/2, panelY + 60, avatarSize/2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      
+      ctx.font = 'bold 28px Arial';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText(player.name.substring(0, 20), panelX + infoWidth/2, panelY + 150);
+      
+      ctx.font = 'bold 40px Arial';
+      ctx.fillStyle = playerData.color === 'blanc' ? '#FFFFFF' : '#FFD700';
+      ctx.fillText(playerData.color === 'blanc' ? '⚪' : '⚫', panelX + infoWidth/2, panelY + 180);
+      
+      if (isCurrent) {
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = '#4cc9f0';
+        ctx.fillText('⬅︎ TOUR ACTUEL', panelX + infoWidth/2, panelY + 220);
+      }
+    }
+
+    return canvas.toBuffer();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function generateStatsImage(playerStatsData, playerId, usersData) {
+  try {
+    const playerInfo = await getPlayerInfo(playerId, usersData);
+    const stats = playerStatsData[playerId] || { wins: 0, losses: 0, draws: 0, played: 0 };
+    const winRate = stats.played > 0 ? Math.round((stats.wins / stats.played) * 100) : 0;
+
+    const canvas = createCanvas(1400, 900);
+    const ctx = canvas.getContext('2d');
+
+    const gradient = ctx.createLinearGradient(0, 0, 1400, 900);
+    gradient.addColorStop(0, '#1a0a0a');
+    gradient.addColorStop(1, '#2a1a1e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1400, 900);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(50, 50, 1300, 800);
+
+    ctx.font = 'bold 55px Arial';
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('◆━━━━━▣✦▣━━━━━━◆', 700, 60);
+    ctx.fillText('📊 STATISTIQUES DAMES', 700, 130);
+    ctx.fillText('◆━━━━━▣✦▣━━━━━━◆', 700, 200);
+
+    if (playerInfo.avatar) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(700, 350, 100, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(playerInfo.avatar, 600, 250, 200, 200);
+      ctx.restore();
+    }
+
+    ctx.font = 'bold 42px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText(playerInfo.name, 700, 500);
+
+    const statsLeft = 200;
+    const statsTop = 580;
+
+    ctx.font = 'bold 36px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+
+    ctx.fillText(`🏆 Victoires: ${stats.wins}`, statsLeft, statsTop);
+    ctx.fillText(`💀 Défaites: ${stats.losses}`, statsLeft, statsTop + 60);
+    ctx.fillText(`🤝 Nuls: ${stats.draws}`, statsLeft, statsTop + 120);
+    ctx.fillText(`🎮 Parties: ${stats.played}`, statsLeft, statsTop + 180);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = winRate >= 50 ? '#00ff00' : winRate >= 30 ? '#ffff00' : '#ff6b6b';
+    ctx.font = 'bold 42px Arial';
+    ctx.fillText(`📈 Ratio: ${winRate}%`, 1200, statsTop);
+
+    const barWidth = 600;
+    const barHeight = 35;
+    const barY = statsTop;
+    const barX = 700;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.fillRect(barX, barY, barWidth, barHeight * 4);
+
+    if (stats.played > 0) {
+      ctx.fillStyle = '#00ff00';
+      const winsWidth = (stats.wins / stats.played) * barWidth;
+      ctx.fillRect(barX, barY, winsWidth, barHeight);
+
+      ctx.fillStyle = '#ff6b6b';
+      const lossesWidth = (stats.losses / stats.played) * barWidth;
+      ctx.fillRect(barX, barY + barHeight, lossesWidth, barHeight);
+
+      ctx.fillStyle = '#ffff00';
+      const drawsWidth = (stats.draws / stats.played) * barWidth;
+      ctx.fillRect(barX, barY + (barHeight * 2), drawsWidth, barHeight);
+    }
+
+    ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.fillText('Victoires', barX + 10, barY + 25);
+    ctx.fillText('Défaites', barX + 10, barY + barHeight + 25);
+    ctx.fillText('Nuls', barX + 10, barY + (barHeight * 2) + 25);
+
+    ctx.font = 'italic 28px Arial';
+    ctx.fillStyle = '#888888';
+    ctx.textAlign = 'center';
+    ctx.fillText('Hedgehog GPT • Système Dames Ultimate', 700, 860);
+
+    return canvas.toBuffer();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function sendImage(api, threadID, imageBuffer, text = "") {
+  try {
+    if (!imageBuffer) return;
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 12);
+    const fileName = `dames_${timestamp}_${random}.png`;
+    const filePath = path.join(ASSETS_DIR, fileName);
+    await fs.writeFile(filePath, imageBuffer);
+    await new Promise((resolve, reject) => {
+      api.sendMessage({
+        body: text,
+        attachment: fs.createReadStream(filePath)
+      }, threadID, (err) => {
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        } catch (e) {}
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+  } catch (error) {}
+}
+
+async function botPlay(game, api, threadID, usersData) {
   const board = game.board;
-  // Appelle la nouvelle fonction getAllLegalMoves qui utilise l'API
   const moves = await getAllLegalMoves(board, 1);
 
   if (moves.length === 0) {
     game.inProgress = false;
     const winner = game.players[0];
+    const loser = game.players[1];
 
-    // Mise à jour des stats
-    if (!playerStats[winner.id]) playerStats[winner.id] = { wins: 0, losses: 0 };
+    ensurePlayerStats(winner.id);
+    ensurePlayerStats(loser.id);
     playerStats[winner.id].wins++;
-    const botPlayer = game.players[1];
-    if (!playerStats[botPlayer.id]) playerStats[botPlayer.id] = { wins: 0, losses: 0 };
-    playerStats[botPlayer.id].losses++;
+    playerStats[winner.id].played++;
+    playerStats[loser.id].losses++;
+    playerStats[loser.id].played++;
+    saveStats();
 
-    await api.sendMessage(
-      `${displayDamier(board)}\n\n🎉| ${winner.name} 𝚛𝚎𝚖𝚙𝚘𝚛𝚝𝚎 𝚕𝚊 𝚙𝚊𝚛𝚝𝚒𝚎 !`,
-      threadID
-    );
+    if (game.imageMode) {
+      const endImage = await generateBoardImage(board, winner, game.players, usersData);
+      if (endImage) await sendImage(api, threadID, endImage, `🎉| ${winner.name} remporte la partie !`);
+    } else {
+      await api.sendMessage(
+        `${displayDamier(board)}\n\n🎉| ${winner.name} remporte la partie !`,
+        threadID
+      );
+    }
+    delete damierGames[threadID];
     return;
   }
+
   let botMove = moves.find(([from, to]) => isValidMoveDamier(board, from, to, "noir") === "prise");
   if (!botMove) botMove = moves[0];
 
@@ -208,10 +510,11 @@ async function botPlay(game, api, threadID) {
   const piece = board[fx][fy];
   board[tx][ty] = piece;
   board[fx][fy] = EMPTY;
-  // Note: isValidMoveDamier est toujours utilisée ici pour la logique de "prise" après avoir obtenu le coup.
-  // Si l'API renvoyait déjà le statut de prise, cette partie pourrait être simplifiée.
-  if (isValidMoveDamier(board, [fx, fy], [tx, ty], "noir") === "prise") {
-    board[(fx + tx) / 2][(fy + ty) / 2] = EMPTY;
+  // si prise, supprimer la pièce au milieu
+  if (Math.abs(fx - tx) === 2 && Math.abs(fy - ty) === 2) {
+    const midX = Math.floor((fx + tx) / 2);
+    const midY = Math.floor((fy + ty) / 2);
+    board[midX][midY] = EMPTY;
   }
   checkPromotion(board);
 
@@ -222,317 +525,86 @@ async function botPlay(game, api, threadID) {
     const winner = hasBlanc ? game.players[0] : game.players[1];
     const loser = hasBlanc ? game.players[1] : game.players[0];
 
-    // Mise à jour des stats
-    if (!playerStats[winner.id]) playerStats[winner.id] = { wins: 0, losses: 0 };
+    ensurePlayerStats(winner.id);
+    ensurePlayerStats(loser.id);
     playerStats[winner.id].wins++;
-    if (!playerStats[loser.id]) playerStats[loser.id] = { wins: 0, losses: 0 };
+    playerStats[winner.id].played++;
     playerStats[loser.id].losses++;
+    playerStats[loser.id].played++;
+    saveStats();
 
-    await api.sendMessage(
-      `${displayDamier(board)}\n\n🎉| ${winner.name} 𝚁𝚎𝚖𝚙𝚘𝚛𝚝𝚎 𝚕𝚊 𝚙𝚊𝚛𝚝𝚒𝚎 !`,
-      threadID
-    );
+    if (game.imageMode) {
+      const endImage = await generateBoardImage(board, winner, game.players, usersData);
+      if (endImage) await sendImage(api, threadID, endImage, `🎉| ${winner.name} remporte la partie !`);
+    } else {
+      await api.sendMessage(
+        `${displayDamier(board)}\n\n🎉| ${winner.name} remporte la partie !`,
+        threadID
+      );
+    }
+    delete damierGames[threadID];
     return;
   }
 
   game.turn = 0;
-  await api.sendMessage(
-    `${displayDamier(board)}\n\n𝙲'𝚎𝚜𝚝 𝚟𝚘𝚝𝚛𝚎 𝚝𝚘𝚞𝚛 !🔄`,
-    threadID
-  );
+
+  if (game.imageMode) {
+    const boardImage = await generateBoardImage(board, game.players[0], game.players, usersData);
+    if (boardImage) await sendImage(api, threadID, boardImage, `C'est votre tour !🔄`);
+  } else {
+    await api.sendMessage(
+      `${displayDamier(board)}\n\nC'est votre tour !🔄`,
+      threadID
+    );
+  }
 }
 
-module.exports = {
-  config: {
-    name: "dames",
-    aliases: ["damiers", "checkers"],
-    version: "1.1",
-    author: "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝐗𝐄 3.0★彡",
-    category: "game",
-    shortDescription: "Jouez aux dames contre un ami ou le bot.",
-    usage: "dames @ami | dames <ID> | dames | dames help | dames stats | dames HedgehogGPT"
-  },
-
-  onStart: async function ({ api, event, args }) {
-    const threadID = event.threadID;
-    const senderID = event.senderID;
-    let opponentID = null;
-    let playWithBot = false;
-    let botName = "➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ";
-
-    // Initialiser les stats du joueur s'il n'existe pas
-    if (!playerStats[senderID]) {
-        playerStats[senderID] = { wins: 0, losses: 0 };
-    }
-
-    const mentionedIDs = event.mentions ? Object.keys(event.mentions) : [];
-    const commandArgs = args.map(arg => arg.toLowerCase());
-
-    // Condition pour le message de bienvenue si "dames" est appelé sans arguments spécifiques
-    if (args.length === 0 || (args.length === 1 && args[0].toLowerCase() === "dames")) { // Vérifie si la commande est juste "dames"
-        return api.sendMessage(
-            `👋| 𝙱𝚒𝚎𝚗𝚟𝚎𝚗𝚞 𝚊𝚞 𝚓𝚎𝚞 𝚍𝚎 𝙳𝚊𝚖𝚎𝚜 !\n` +
-            `\nPour commencer une partie :\n` +
-            `  •  Pour jouer contre moi (le bot) : tapez \`dames HedgehogGPT\`\n` +
-            `  •  Pour jouer contre un ami : tapez \`dames @nom_de_l_ami\` ou \`dames <son_ID>\`\n` +
-            `\nUne fois la partie lancée, pour faire un coup : \`case_départ case_arrivée\` (ex: b6 a5).\n` +
-            `\nPour plus d'aide : \`dames help\`\n` +
-            `Pour voir vos statistiques : \`dames stats\`\n` +
-            `\n━━━━━━━━❪❐❫━━━━━━━━\n` +
-            `Amusez-vous bien ! 🎲`,
-            threadID,
-            event.messageID
-        );
-    }
-
-    if (commandArgs.includes("hedgehoggpt")) {
-        playWithBot = true;
-    } else if (mentionedIDs.length > 0) {
-        opponentID = mentionedIDs[0];
-    } else if (args[0] && /^\d+$/.test(args[0])) {
-        opponentID = args[0];
-    }
-
-
-    if (opponentID && opponentID == senderID) {
-      return api.sendMessage("Vous ne pouvez pas jouer contre vous-même !", threadID, event.messageID);
-    }
-
-    // Récupération nom auteur via API (maintenu tel quel)
-    let authorName = "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝚇𝙴 3.0★彡";
-    try {
-      const authorResponse = await fetch('https://author-name.vercel.app/');
-      const authorJson = await authorResponse.json();
-      authorName = authorJson.author || authorName;
-    } catch (e) { /* ignore */ }
-
-
-    // Déterminer le gameID de manière cohérente
-    const gameID = playWithBot
-      ? `${threadID}:${senderID}:BOT`
-      : `${threadID}:${Math.min(senderID, opponentID)}:${Math.max(senderID, opponentID)}`;
-
-    if (damierGames[gameID] && damierGames[gameID].inProgress) {
-      return api.sendMessage("❌| 𝚄𝚗𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚎𝚜𝚝 𝚍𝚎𝚓𝚊 𝚎𝚗 𝚌𝚘𝚞𝚛𝚜 𝚎𝚗𝚝𝚛𝚎 𝚍𝚎𝚜 𝚓𝚘𝚞𝚎𝚞𝚛𝚜. 𝚅𝚎𝚞𝚒𝚕𝚕𝚎𝚣 𝚙𝚊𝚝𝚒𝚎𝚗𝚝𝚎𝚛 ⏳.", threadID, event.messageID);
-    }
-
-    let player1Info, player2Info;
-    if (playWithBot) {
-      player1Info = await api.getUserInfo([senderID]);
-      damierGames[gameID] = {
-        board: createDamierBoard(),
-        players: [
-          { id: senderID, name: player1Info[senderID].name, color: "blanc" },
-          { id: "BOT", name: botName, color: "noir" }
-        ],
-        turn: 0,
-        inProgress: true,
-        vsBot: true,
-        threadID: threadID
-      };
-      // Initialiser les stats du bot s'il n'existe pas
-      if (!playerStats["BOT"]) {
-          playerStats["BOT"] = { wins: 0, losses: 0 };
-      }
-      api.sendMessage(
-        `📣| 𝙻𝚊𝚗𝚌𝚎𝚖𝚎𝚗𝚝 𝚍'𝚞𝚗𝚎 𝚗𝚘𝚞𝚟𝚎𝚕𝚕𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚍𝚎 𝚍𝚊𝚖𝚎𝚜 𝚎𝚗𝚝𝚛𝚎 ${player1Info[senderID].name} (⚪) 𝚎𝚝 ${botName} (⚫) !\n━━━━━━━━❪❐❫━━━━━━━━\n${displayDamier(damierGames[gameID].board)}\n━━━━━━━━❪❐❫━━━━━━━━\n${player1Info[senderID].name}, à 𝚟𝚘𝚞𝚜 𝚍𝚎 𝚌𝚘𝚖𝚖𝚎𝚗𝚌𝚎𝚛 (𝚎𝚡: b6 a5).\n📛| 𝚅𝚘𝚞𝚜 𝚙𝚘𝚞𝚟𝚎𝚣 𝚎𝚐𝚊𝚕𝚎𝚖𝚎𝚗𝚝 𝚜𝚊𝚒𝚜𝚒𝚛 𝚝𝚘𝚞𝚝 𝚜𝚒𝚖𝚙𝚕𝚎𝚖𝚎𝚗𝚝 "𝚏𝚘𝚛𝚏𝚊𝚒𝚝" 𝚙𝚘𝚞𝚛 𝚜𝚝𝚘𝚙𝚙𝚎𝚛 𝚕𝚎 𝚓𝚎𝚞 !`,
-        threadID,
-        event.messageID
-      );
-    } else {
-      player1Info = await api.getUserInfo([senderID]);
-      player2Info = await api.getUserInfo([opponentID]);
-      if (!player2Info[opponentID]) return api.sendMessage("Impossible de récupérer les infos du joueur invité.", threadID, event.messageID);
-
-      // Initialiser les stats de l'adversaire s'il n'existe pas
-      if (!playerStats[opponentID]) {
-          playerStats[opponentID] = { wins: 0, losses: 0 };
-      }
-
-      damierGames[gameID] = {
-        board: createDamierBoard(),
-        players: [
-          { id: senderID, name: player1Info[senderID].name, color: "blanc" },
-          { id: opponentID, name: player2Info[opponentID].name, color: "noir" }
-        ],
-        turn: 0,
-        inProgress: true,
-        vsBot: false,
-        threadID: threadID
-      };
-
-      api.sendMessage(
-        `📣| 𝙻𝚊𝚗𝚌𝚎𝚖𝚎𝚗𝚝 𝚍'𝚞𝚗𝚎 𝚗𝚘𝚞𝚟𝚎𝚕𝚕𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚍𝚎 𝚍𝚊𝚖𝚎𝚜 𝚎𝚗𝚝𝚛𝚎 ${player1Info[senderID].name} (⚪) 𝚎𝚝 ${player2Info[opponentID].name} (⚫) !\n━━━━━━━━❪❐❫━━━━━━━━\n${displayDamier(damierGames[gameID].board)}\n━━━━━━━━❪❐❫━━━━━━━━\n${player1Info[senderID].name}, à 𝚟𝚘𝚞𝚜 𝚍𝚎 𝚌𝚘𝚖𝚖𝚎𝚗𝚌𝚎𝚛 (𝚎𝚡: b6 a5).\n📛| 𝚅𝚘𝚞𝚜 𝚙𝚘𝚞𝚟𝚎𝚣 𝚎𝚐𝚊𝚕𝚎𝚖𝚎𝚗𝚝 𝚜𝚊𝚒𝚜𝚒𝚛 𝚝𝚘𝚞𝚝 𝚜𝚒𝚖𝚙𝚕𝚎𝚖𝚎𝚗𝚝 "𝚏𝚘𝚛𝚏𝚊𝚒𝚝" 𝚙𝚘𝚞𝚛 𝚜𝚝𝚘𝚙𝚙𝚎𝚛 𝚕𝚎 𝚓𝚎𝚞 !`,
-        threadID,
-        event.messageID
-      );
-    }
-  },
-
-  onChat: async function ({ api, event }) {
-    const threadID = event.threadID;
-    const senderID = event.senderID;
-    const messageBody = event.body.trim().toLowerCase();
-
-    // Vérifier les commandes globales (help, stats) avant de chercher une partie en cours
-    if (messageBody === "dames help") {
-        return api.sendMessage(
-            "📜| 𝙰𝚒𝚍𝚎 𝚙𝚘𝚞𝚛 𝚕𝚎 𝚓𝚎𝚞 𝚍𝚎 𝙳𝚊𝚖𝚎𝚜 :\n" +
-            "  •  `𝚍𝚊𝚖𝚎𝚜 HedgehogGPT` : 𝙻𝚊𝚗𝚌𝚎 𝚞𝚗𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚌𝚘𝚗𝚝𝚛𝚎 𝚕𝚎 𝚋𝚘𝚝.\n" +
-            "  •  `𝚍𝚊𝚖𝚎𝚜 @𝚖𝚘𝚗_𝚊𝚖𝚒` : 𝙻𝚊𝚗𝚌𝚎 𝚞𝚗𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚌𝚘𝚗𝚝𝚛𝚎 𝚞𝚗 𝚊𝚖𝚒 𝚖𝚎𝚗𝚝𝚒𝚘𝚗𝚗𝚎́.\n" +
-            "  •  `𝚍𝚊𝚖𝚎𝚜 <𝙸𝙳>` : 𝙻𝚊𝚗𝚌𝚎 𝚞𝚗𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚌𝚘𝚗𝚝𝚛𝚎 𝚞𝚗 𝚊𝚖𝚒 𝚙𝚊𝚛 𝚜𝚘𝚗 𝙸𝙳.\n" +
-            "  •  `𝚋𝟼 𝚊𝟻` : 𝙴𝚏𝚏𝚎𝚌𝚝𝚞𝚎 𝚞𝚗 𝚖𝚘𝚞𝚟𝚎𝚖𝚎𝚗𝚝. (𝙴𝚡𝚎𝚖𝚙𝚕𝚎 : 𝚍𝚎 𝚋𝟼 𝚟𝚎𝚛𝚜 𝚊𝟻)\n" +
-            "  •  `𝚏𝚘𝚛𝚏𝚊𝚒𝚝` : 𝙰𝚋𝚊𝚗𝚍𝚘𝚗𝚗𝚎 𝚕𝚊 𝚙𝚊𝚛𝚝𝚒𝚎 𝚎𝚗 𝚌𝚘𝚞𝚛𝚜.\n" +
-            "  •  `𝚛𝚎𝚓𝚘𝚞𝚎𝚛` : 𝚁𝚎𝚕𝚊𝚗𝚌𝚎 𝚞𝚗𝚎 𝚗𝚘𝚞𝚟𝚎𝚕𝚕𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚊𝚟𝚎𝚌 𝚕𝚎𝚜 𝚖𝚎̂𝚖𝚎𝚜 𝚓𝚘𝚞𝚎𝚞𝚛𝚜.\n" +
-            "  •  `𝚍𝚊𝚖𝚎𝚜 𝚜𝚝𝚊𝚝𝚜` : 𝙰𝚏𝚏𝚒𝚌𝚑𝚎 𝚟𝚘𝚜 𝚜𝚝𝚊𝚝𝚒𝚜𝚝𝚒𝚚𝚞𝚎𝚜 𝚍𝚎 𝚓𝚎𝚞.\n" +
-            "━━━━━━━━❪❐❫━━━━━━━━",
-            threadID,
-            event.messageID
-        );
-    }
-
-    if (messageBody === "dames stats") {
-        const stats = playerStats[senderID];
-        if (stats) {
-            return api.sendMessage(
-                `📊| 𝚅𝚘𝚜 𝚜𝚝𝚊𝚝𝚒𝚜𝚝𝚒𝚚𝚞𝚎𝚜 :\n` +
-                `  •  𝚅𝚒𝚌𝚝𝚘𝚒𝚛𝚎𝚜 : ${stats.wins}\n` +
-                `  •  𝙳𝚎́𝚏𝚊𝚒𝚝𝚎𝚜 : ${stats.losses}\n` +
-                `━━━━━━━━❪❐❫━━━━━━━━`,
-                threadID,
-                event.messageID
-            );
-        } else {
-            return api.sendMessage(
-                `📊| 𝚅𝚘𝚞𝚜 𝚗'𝚊𝚟𝚎𝚣 𝚙𝚊𝚜 𝚎𝚗𝚌𝚘𝚛𝚎 𝚓𝚘𝚞𝚎́ 𝚍𝚎 𝚙𝚊𝚛𝚝𝚒𝚎𝚜. 𝙻𝚊𝚗𝚌𝚎𝚣-𝚟𝚘𝚞𝚜 !`,
-                threadID,
-                event.messageID
-            );
-        }
-    }
-
-    // Trouver la game correspondante (contre ami ou bot)
-    // On cherche une partie dans le thread actuel qui implique le senderID ou qui est contre le BOT
-    const gameID = Object.keys(damierGames).find((id) =>
-        damierGames[id].threadID === threadID &&
-        (id.includes(senderID) || damierGames[id].players.some(p => p.id === senderID || p.id === "BOT"))
-    );
-
-    if (!gameID) return; // Si aucune partie n'est trouvée pour ce joueur dans ce thread
-    const game = damierGames[gameID];
-    if (!game.inProgress) return; // La partie est terminée
-
-    const board = game.board;
-    const currentPlayer = game.players[game.turn];
-
-    // Vérifier si le message vient du bon joueur et dans le bon thread
-    if (game.vsBot && game.turn === 1) { // C'est le tour du bot
-        // Le bot ne doit pas être "interrompu" par des messages de l'utilisateur
-        return; // Ignorer le message s'il n'est pas censé interagir avec le bot à ce moment
-    }
-
-    // Si ce n'est pas une partie bot ou si c'est le tour d'un humain
-    if (!game.vsBot && senderID != currentPlayer.id) {
-        return api.sendMessage(`Ce n'est pas votre tour !`, threadID, event.messageID);
-    }
-    // Si c'est le tour du joueur humain contre le bot, on continue
-    if (game.vsBot && senderID != currentPlayer.id) {
-        return; // Ce message ne vient pas du joueur actuel, ignorer
-    }
-
-
-    if (["forfait", "abandon"].includes(messageBody)) {
-      const opponent = game.players.find(p => p.id != senderID);
-      game.inProgress = false;
-
-      // Mise à jour des stats pour l'abandon
-      if (!playerStats[currentPlayer.id]) playerStats[currentPlayer.id] = { wins: 0, losses: 0 };
-      playerStats[currentPlayer.id].losses++;
-      if (!playerStats[opponent.id]) playerStats[opponent.id] = { wins: 0, losses: 0 };
-      playerStats[opponent.id].wins++;
-
-      return api.sendMessage(`🏳️| ${currentPlayer.name} 𝚊 𝚊𝚋𝚊𝚗𝚍𝚘𝚗𝚗é 𝚕𝚊 𝚙𝚊𝚛𝚝𝚒𝚎. ${opponent.name} 𝚕𝚊 𝚛𝚎𝚖𝚙𝚘𝚛𝚝𝚎 🎉✨ !`, threadID);
-    }
-
-    if (["restart", "rejouer"].includes(messageBody)) {
-      const [player1, player2] = game.players;
-      damierGames[gameID] = {
-        board: createDamierBoard(),
-        players: [player1, player2],
-        turn: 0,
-        inProgress: true,
-        vsBot: game.vsBot,
-        threadID: threadID
-      };
-      return api.sendMessage(
-        `📣| 𝙽𝚘𝚞𝚟𝚎𝚕𝚕𝚎 𝚙𝚊𝚛𝚝𝚒𝚎 𝚍𝚎 𝚍𝚊𝚖𝚎𝚜 𝚎𝚗𝚝𝚛𝚎 ${player1.name} (⚪) 𝚎𝚝 ${player2.name} (⚫) !\n━━━━━━━━❪❐❫━━━━━━━━\n${displayDamier(damierGames[gameID].board)}\n━━━━━━━━❪❐❫━━━━━━━━\n${player1.name}, 𝙲'𝚎𝚜𝚝 𝚟𝚘𝚞𝚜 𝚚𝚞𝚒 𝚌𝚘𝚖𝚖𝚎𝚗𝚌𝚎𝚣 (ex: b6 a5).\n📛| 𝚅𝚘𝚞𝚜 𝚙𝚘𝚞𝚟𝚎𝚣 𝚊𝚞𝚜𝚜𝚒 𝚜𝚝𝚘𝚙𝚙𝚎𝚛 𝚕𝚎 𝚓𝚎𝚞 𝚎𝚗 𝚜𝚊𝚒𝚜𝚒𝚜𝚜𝚊𝚗𝚝 𝚜𝚒𝚖𝚙𝚕𝚎𝚖𝚎𝚗𝚝 " 𝚏𝚘𝚛𝚏𝚊𝚒𝚝"`,
-        threadID
-      );
-    }
-
-    const move = parseDamierMove(messageBody);
-    if (!move) {
-      return api.sendMessage(`Mouvement invalide. Utilisez la notation : b6 a5`, threadID, event.messageID);
-    }
-
-    const [[fx, fy], [tx, ty]] = move;
-    const piece = board[fx][fy];
-
-    if (
-      (game.turn === 0 && ![PION_B, DAME_B].includes(piece)) ||
-      (game.turn === 1 && ![PION_N, DAME_N].includes(piece))
-    ) {
-      return api.sendMessage(`Vous ne pouvez déplacer que vos propres pions !`, threadID, event.messageID);
-    }
-
-    const moveState = isValidMoveDamier(board, [fx, fy], [tx, ty], game.turn === 0 ? "blanc" : "noir");
-    if (!moveState) {
-      return api.sendMessage(`Coup illégal ou impossible.`, threadID, event.messageID);
-    }
-
-    board[tx][ty] = piece;
-    board[fx][fy] = EMPTY;
-    if (moveState === "prise") {
-      board[(fx + tx) / 2][(fy + ty) / 2] = EMPTY;
-    }
-    checkPromotion(board);
-
-    const hasBlanc = hasPieces(board, PION_B, DAME_B);
-    const hasNoir = hasPieces(board, PION_N, DAME_N);
-    if (!hasBlanc || !hasNoir) {
-      game.inProgress = false;
-      const winner = hasBlanc ? game.players[0] : game.players[1];
-      const loser = hasBlanc ? game.players[1] : game.players[0];
-
-      // Mise à jour des stats de fin de partie
-      if (!playerStats[winner.id]) playerStats[winner.id] = { wins: 0, losses: 0 };
-      playerStats[winner.id].wins++;
-      if (!playerStats[loser.id]) playerStats[loser.id] = { wins: 0, losses: 0 };
-      playerStats[loser.id].losses++;
-
-      return api.sendMessage(
-        `${displayDamier(board)}\n\n🎉| ${winner.name} 𝚛𝚎𝚖𝚙𝚘𝚛𝚝𝚎 𝚕𝚊 𝚙𝚊𝚛𝚝𝚒𝚎  !`,
-        threadID
-      );
-    }
-
-    game.turn = (game.turn + 1) % 2;
-    const nextPlayer = game.players[game.turn];
-
-    if (game.vsBot && game.turn === 1) {
-      await api.sendMessage(
-        `${displayDamier(board)}\n\n➤『 𝙷𝙴𝙳𝙶𝙴𝙷𝙾𝙶𝄞𝙶𝙿𝚃 』☜ヅ réfléchit...🤔`,
-        threadID
-      );
-      // Le bot joue après un délai pour simuler une réflexion
-      setTimeout(async () => {
-        await botPlay(game, api, threadID);
-      }, 10000); // 10 secondes de "réflexion"
-    } else {
-      api.sendMessage(
-        `${displayDamier(board)}\n\n${nextPlayer.name}, 𝚌'𝚎𝚜𝚝 𝚟𝚘𝚝𝚛𝚎 𝚝𝚘𝚞𝚛 !🔄`,
-        threadID
-      );
-    }
+/* ------- Helpers pour créer/démarrer une partie ------- */
+async function startGameWithAI(api, threadID, starterId, usersData) {
+  const board = createDamierBoard();
+  const starterName = (await usersData.getName(starterId)) || `Joueur ${starterId}`;
+  const game = {
+    board,
+    players: [
+      { id: starterId, name: starterName, color: 'blanc' },
+      { id: 'AI', name: BOT_NAME, color: 'noir' }
+    ],
+    turn: 0,
+    inProgress: true,
+    imageMode: imageModeByThread[threadID] || false
+  };
+  damierGames[threadID] = game;
+  ensurePlayerStats(starterId);
+  if (game.imageMode) {
+    const img = await generateBoardImage(board, game.players[0], game.players, usersData);
+    if (img) return sendImage(api, threadID, img, `🔰| Partie vs IA démarrée ! Vous êtes ⚪ (blanc).`);
   }
-};
+  return api.sendMessage(`🔰| Partie vs IA démarrée !\n\n${displayDamier(board)}\n\nVous êtes ⚪ (blanc).`, threadID);
+}
+
+async function startGameWithFriend(api, threadID, starterId, friendId, usersData) {
+  if (String(starterId) === String(friendId)) {
+    return api.sendMessage(`❌| Vous ne pouvez pas jouer contre vous-même.`, threadID);
+  }
+  const board = createDamierBoard();
+  const starterName = (await usersData.getName(starterId)) || `Joueur ${starterId}`;
+  const friendName = (await usersData.getName(friendId)) || `Joueur ${friendId}`;
+  const game = {
+    board,
+    players: [
+      { id: starterId, name: starterName, color: 'blanc' },
+      { id: friendId, name: friendName, color: 'noir' }
+    ],
+    turn: 0,
+    inProgress: true,
+    imageMode: imageModeByThread[threadID] || false
+  };
+  damierGames[threadID] = game;
+  ensurePlayerStats(starterId);
+  ensurePlayerStats(friendId);
+  if (game.imageMode) {
+    const img = await generateBoardImage(board, game.players[0], game.players, usersData);
+    if (img) return sendImage(api, threadID, img, `🔰| Partie démarrée entre ${starterName} (⚪) et ${friendName} (⚫).`);
+  }
+  return api.sendMessage(`🔰| Partie démarrée entre ${starterName} (⚪) et ${friendName} (⚫).\n\n${displayDamier(board)}`, threadID);
+}
