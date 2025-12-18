@@ -5,7 +5,9 @@ const fs = require('fs-extra');
 const path = require('path');
 
 const ASSETS_DIR = path.join(__dirname, 'uptime_assets');
-const BOT_UID = "61584915780524";
+
+const configPath = path.join(__dirname, "config.json");
+const { BOT_UID } = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 const BOT_NAME = "Hedgehog GPT";
 
 if (!fs.existsSync(ASSETS_DIR)) {
