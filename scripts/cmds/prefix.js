@@ -156,7 +156,7 @@ async function sendImage(api, event, imageBuffer) {
     
     await new Promise((resolve, reject) => {
       api.sendMessage({
-        body: "▬▬▬▬▬▬▬▬▬▬▬▬▬",
+        body: "",
         attachment: fs.createReadStream(filePath)
       }, event.threadID, (err, info) => {
         try {
