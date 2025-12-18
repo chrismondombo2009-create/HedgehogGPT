@@ -3,10 +3,12 @@ const fs = require('fs-extra');
 const path = require('path');
 const Canvas = require('canvas');
 
+const configPath = path.join(__dirname, "config.json");
+const { BOT_UID } = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+
 const API_KEY = 'uchiha-perdu-storm';
 const API_URL = 'https://combat-storm.vercel.app';
 const IMAGE_URL = 'https://i.ibb.co/S4r4xpF0/file-0000000084f86243b7f327827bf6e062.png';
-const BOT_UID = "61584915780524";
 
 const formatMessage = (msg) => `≪━─━─━─◈─━─━─━≫\n${msg}\n≪━─━─━─◈─━─━─━≫`;
 
