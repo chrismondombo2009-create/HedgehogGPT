@@ -57,7 +57,6 @@ async function apiPost(url, data, headers = {}, retries = 3) {
       if (response.status === 200) return response;
       throw new Error(`Status: ${response.status}`);
     } catch (err) {
-      if (err.response && err.response.data) throw err;
       if (i === retries - 1) throw err;
       await new Promise(r => setTimeout(r, 2000));
     }
@@ -554,7 +553,7 @@ module.exports = {
       const isP1 = senderID === state.players.player1.uid;
       try {
         const res = await apiPost(`${API_URL}/character`, { character: char }, { 'x-api-key': API_KEY });
-        let charData = res.data;
+        let charData = typeof res.data === 'string' ? extractJSON(res.data) : res.data;
         
         if (!charData || charData.valid === false) {
           state.processing = false;
@@ -582,9 +581,10 @@ module.exports = {
           await initCombat(state, stateFile, message, threadID);
         }
       } catch (err) {
+        console.error(err);
         state = getInitialState();
         await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
-        await message.reply(formatMessage(`Erreur API. Reset.`));
+        await message.reply(formatMessage(`Erreur API critique lors du choix. Partie réinitialisée.`));
         await fs.unlink(stateFile).catch(() => {});
       } finally {
         if (state.status !== 'idle') {
@@ -626,7 +626,7 @@ async function generateIaCharacter(state, stateFile, message, senderName, thread
       aiDifficulty: state.aiDifficulty 
     }, { 'x-api-key': API_KEY });
     
-    let charData = res.data;
+    let charData = typeof res.data === 'string' ? extractJSON(res.data) : res.data;
     
     state.characters.player2 = charData.suggested_char;
     state.charInfo.player2 = charData;
@@ -637,7 +637,7 @@ async function generateIaCharacter(state, stateFile, message, senderName, thread
     console.error("Erreur génération IA:", error.message);
     state.status = 'idle';
     await fs.writeFile(stateFile, JSON.stringify(state, null, 2));
-    await message.reply(formatMessage(`Erreur génération IA.`));
+    await message.reply(formatMessage(`Erreur génération IA. Partie annulée.`));
   }
 }
 
@@ -653,7 +653,7 @@ async function initCombat(state, stateFile, message, threadID) {
       player2_name: state.players.player2.name 
     }, { 'x-api-key': API_KEY });
     
-    const preResult = preRes.data || { decision: "normal_combat" };
+    const preResult = (typeof preRes.data === 'string' ? extractJSON(preRes.data) : preRes.data) || { decision: "normal_combat" };
     
     if (preResult.decision === "instant_one_shot") {
       const winnerName = state.players[preResult.winner].name;
@@ -701,7 +701,7 @@ async function iaTurn(api, state, stateFile, threadID, message, usersData) {
       aiDifficulty: state.aiDifficulty 
     }, { 'x-api-key': API_KEY });
     
-    const result = res.data;
+    const result = typeof res.data === 'string' ? extractJSON(res.data) : res.data;
     if (result.decision === 'ignore_message') return;
     
     state.stats = result.stats || state.stats;
@@ -741,7 +741,8 @@ async function iaTurn(api, state, stateFile, threadID, message, usersData) {
 }
 
 function initStats(info = {}) {
-  return { pv: 100, endurance: 100, ...(info.resource_name && info.resource_name !== 'none' ? { [info.resource_name]: 100 } : {}) };
+  const safeInfo = info || {};
+  return { pv: 100, endurance: 100, ...(safeInfo.resource_name && safeInfo.resource_name !== 'none' ? { [safeInfo.resource_name]: 100 } : {}) };
 }
 
 async function handleAction(event, api, state, stateFile, isRiposte, threadID, message, usersData) {
@@ -781,8 +782,8 @@ async function handleAction(event, api, state, stateFile, isRiposte, threadID, m
     }
   }
 
-  const result = res.data;
-  if (result.decision === 'ignore_message') return;
+  const result = typeof res.data === 'string' ? extractJSON(res.data) : res.data;
+  if (!result || result.decision === 'ignore_message') return;
 
   state.stats = result.stats || state.stats;
   state.history.push({ action: isRiposte ? `Riposte: ${action}` : action, result });
