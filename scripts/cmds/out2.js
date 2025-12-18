@@ -1,7 +1,13 @@
 const { getTime } = global.utils;
 const Canvas = require("canvas");
-const fs = require("fs");
+const fs = require("fs-extra");
 const path = require("path");
+
+const configPath = path.join(__dirname, "config.json");
+const { BOT_UID } = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+
+const CACHE_DIR = path.join(__dirname, "cache");
+fs.mkdirSync(CACHE_DIR, { recursive: true });
 
 module.exports = {
   config: {
@@ -12,16 +18,53 @@ module.exports = {
     role: 1,
     category: "admin",
     shortDescription: "Gestionnaire de groupes version Uchiha",
-    longDescription: "Liste des groupes ou départ stylé avec Canvas + messages aléatoires + emojis",
+    longDescription: "Liste des groupes ou départ.",
     guide: { en: "{pn} ou {pn} [ID]" }
   },
 
-  onStart: async function ({ api, event, args, message }) {
-    const allowedUIDs = ['61563822463333','61578433048588','100083846212138'];
+  createCanvasImage: async function({ title, subtitle, count }) {
+    const canvas = Canvas.createCanvas(900, 500);
+    const ctx = canvas.getContext("2d");
 
+    const grad = ctx.createLinearGradient(0, 0, 900, 500);
+    grad.addColorStop(0, "#000000");
+    grad.addColorStop(1, "#8B0000");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 900, 500);
+
+    ctx.fillStyle = "#ff0000";
+    ctx.beginPath();
+    ctx.arc(450, 220, 140, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(450, 220, 80, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 80px Arial";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "#ff0000";
+    ctx.shadowBlur = 40;
+    ctx.fillText(title, 450, 350);
+
+    if (count !== undefined) {
+      ctx.font = "50px Arial";
+      ctx.fillStyle = "#ff4444";
+      ctx.fillText(`${count} groupes anéantis`, 450, 420);
+    }
+
+    const filePath = path.join(CACHE_DIR, `out2_${Date.now()}.png`);
+    fs.writeFileSync(filePath, canvas.toBuffer());
+    return filePath;
+  },
+
+  onStart: async function({ api, event, args, message }) {
+    const allowedUIDs = ['61563822463333','61578433048588','100083846212138'];
     if (!allowedUIDs.includes(event.senderID)) {
       return message.reply(`◆━━━━━▣✦▣━━━━━━◆
-│ ACCÈS REFUSÉ 
+│ ACCÈS REFUSÉ   
 │
 │ T'as cru pouvoir utiliser
 │ cette commande sans être
@@ -37,7 +80,6 @@ module.exports = {
       try {
         const threads = await api.getThreadList(500, null, ["INBOX"]);
         const groups = threads.filter(t => t.isGroup && t.threadID !== event.threadID);
-
         if (groups.length === 0) return message.reply("◆━━━━━▣✦▣━━━━━━◆\n│ Aucun groupe trouvé\n◆━━━━━▣✦▣━━━━━━◆");
 
         let count = 0;
@@ -45,17 +87,17 @@ module.exports = {
         for (const g of groups) {
           try {
             const leaveMsg = [
-`◆━━━━━▣✦▣━━━━━━◆
+              `◆━━━━━▣✦▣━━━━━━◆
 │ AMATERASU TOTAL
 │ Votre groupe fait partie des faibles.
 │ Je quitte tout. Brûlez 🔥🖤
 ◆━━━━━▣✦▣━━━━━━◆`,
-`◆━━━━━▣✦▣━━━━━━◆
+              `◆━━━━━▣✦▣━━━━━━◆
 │ ORDRE UCHIHA SUPRÊME
 │ Je quitte tous les groupes.
 │ Sayonara 🗡️
 ◆━━━━━▣✦▣━━━━━━◆`,
-`◆━━━━━▣✦▣━━━━━━◆
+              `◆━━━━━▣✦▣━━━━━━◆
 │ MASSACRE FINAL
 │ Comme Itachi, je nettoie tout.
 │ Ce groupe n’existe plus 🩸
@@ -69,40 +111,7 @@ module.exports = {
           } catch {}
         }
 
-        const canvas = Canvas.createCanvas(900, 500);
-        const ctx = canvas.getContext("2d");
-
-        const grad = ctx.createLinearGradient(0, 0, 900, 500);
-        grad.addColorStop(0, "#000000");
-        grad.addColorStop(1, "#8B0000");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 900, 500);
-
-        ctx.fillStyle = "#ff0000";
-        ctx.beginPath();
-        ctx.arc(450, 220, 140, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "#000";
-        ctx.beginPath();
-        ctx.arc(450, 220, 80, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 80px Arial";
-        ctx.textAlign = "center";
-        ctx.shadowColor = "#ff0000";
-        ctx.shadowBlur = 40;
-        ctx.fillText("MASSACRE TERMINÉ", 450, 350);
-
-        ctx.font = "50px Arial";
-        ctx.fillStyle = "#ff4444";
-        ctx.fillText(`${count} groupes anéantis`, 450, 420);
-
-        const filePath = path.join(__dirname, "cache", `massacre_${Date.now()}.png`);
-        fs.mkdirSync(path.dirname(filePath), { recursive: true });
-        fs.writeFileSync(filePath, canvas.toBuffer());
-
+        const filePath = await this.createCanvasImage({ title: "MASSACRE TERMINÉ", count });
         return message.reply({
           body: `◆━━━━━▣✦▣━━━━━━◆\n│ AMATERASU EXÉCUTÉ\n│ ${count} groupes quittés\n◆━━━━━▣✦▣━━━━━━◆`,
           attachment: fs.createReadStream(filePath)
@@ -155,7 +164,7 @@ module.exports = {
       const groupName = info.name || "Groupe inconnu";
 
       const leaveMessages = [
-`◆━━━━━▣✦▣━━━━━━◆
+        `◆━━━━━▣✦▣━━━━━━◆
 │ DÉPART DU BOT
 │
 │ Mon maître m'a ordonné
@@ -165,16 +174,15 @@ module.exports = {
 │
 │ 👋😂🖕
 ◆━━━━━▣✦▣━━━━━━◆`,
-`◆━━━━━▣✦▣━━━━━━◆
+        `◆━━━━━▣✦▣━━━━━━◆
 │ SHARINGAN ACTIVÉ
 │
 │ J'ai tout vu, tout mémorisé...
-│ Vos dramas, vos nudes, tout.
-│ Je pars, mais je n'oublie pas
+│ Vos dramas, vos nudes, tout. Je pars, mais je n'oublie pas
 │
-│ Dormez mal 
+│ Dormez mal
 ◆━━━━━▣✦▣━━━━━━◆`,
-`◆━━━━━▣✦▣━━━━━━◆
+        `◆━━━━━▣✦▣━━━━━━◆
 │ AMATERASU
 │
 │ Ce groupe brûle déjà
@@ -189,52 +197,7 @@ module.exports = {
       await api.sendMessage(randomLeave, groupID);
       await new Promise(r => setTimeout(r, 2500));
 
-      const canvas = Canvas.createCanvas(900, 500);
-      const ctx = canvas.getContext("2d");
-
-      const grad = ctx.createLinearGradient(0, 0, 900, 500);
-      grad.addColorStop(0, "#ff0000");
-      grad.addColorStop(0.5, "#000000");
-      grad.addColorStop(1, "#8B0000");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 900, 500);
-
-      ctx.fillStyle = "#000";
-      ctx.beginPath();
-      ctx.arc(450, 220, 130, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "#ff0000";
-      ctx.beginPath();
-      ctx.arc(450, 220, 120, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "#000";
-      ctx.beginPath();
-      ctx.arc(450, 220, 70, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 68px Arial";
-      ctx.textAlign = "center";
-      ctx.shadowColor = "#ff0000";
-      ctx.shadowBlur = 30;
-      ctx.fillText("DÉPART RÉUSSI", 450, 360);
-
-      ctx.shadowBlur = 0;
-      ctx.font = "42px Arial";
-      ctx.fillStyle = "#ff4444";
-      ctx.fillText(groupName, 450, 410);
-
-      ctx.font = "32px Arial";
-      ctx.fillStyle = "#fff";
-      ctx.fillText(`ID: ${groupID}`, 450, 450);
-
-      const buffer = canvas.toBuffer("image/png");
-      const filePath = path.join(__dirname, "cache", `out2_${Date.now()}.png`);
-      fs.mkdirSync(path.join(__dirname, "cache"), { recursive: true });
-      fs.writeFileSync(filePath, buffer);
-
+      const filePath = await this.createCanvasImage({ title: "DÉPART RÉUSSI", subtitle: groupName });
       await api.removeUserFromGroup(api.getCurrentUserID(), groupID);
 
       await message.reply({
@@ -248,10 +211,10 @@ module.exports = {
       console.error(err);
       message.reply(`◆━━━━━▣✦▣━━━━━━◆
 │ ERREUR
-│ 
+│   
 │ Impossible de quitter
 │ le groupe.
-│ 
+│   
 │ • ID incorrect
 │ • Bot déjà parti
 │ • Pas admin
