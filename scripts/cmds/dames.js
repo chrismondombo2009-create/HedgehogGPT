@@ -5,7 +5,9 @@ const { createCanvas, loadImage } = require('canvas');
 
 const STATS_FILE = path.join(__dirname, 'dames_stats.json');
 const ASSETS_DIR = path.join(__dirname, 'dames_assets');
-const BOT_UID = "61579341020538";
+
+const configPath = path.join(__dirname, "config.json");
+const { BOT_UID } = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 const BOT_NAME = "Hedgehog GPT";
 
 const damierGames = {};
