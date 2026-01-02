@@ -13,7 +13,7 @@ const ADMIN1_NAME = "Walter O'Brien";
 const ADMIN2_NAME = "ʚʆɞ Sømå Sønïč ʚʆɞ";
 
 module.exports = {
-  config: { name: "welcome", version: "2.0", author: "System", category: "events" },
+  config: { name: "welcome", version: "2.0", author: "Ntkhang(modified by L'Uchiha Perdu", category: "events" },
 
   langs: {
     en: {
