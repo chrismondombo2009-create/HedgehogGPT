@@ -12,7 +12,7 @@
 		"axios": "^1.4.0",
 		"bcrypt": "^5.0.1",
 		"bluebird": "^3.7.2",
-		"canvas": "^2.9.1",
+		"canvas": "^2.11.2",
 		"cheerio": "^1.0.0-rc.12",
 		"child_process": "^1.0.2",
 		"connect-flash": "^0.1.1",
@@ -49,12 +49,15 @@
 		"sqlite3": "^5.0.5",
 		"tinyurl": "^1.1.7",
 		"totp-generator": "^0.0.13",
-		"websocket-stream": "^5.5.2"
+		"websocket-stream": "^5.5.2",
+		"crypto": "^1.0.1",
+		"ffmpeg-static": "^5.1.0"
 	},
 	"scripts": {
 		"start": "set NODE_ENV=&& node index.js",
 		"dev": "set NODE_ENV=development&& node index.js",
-		"prod": "set NODE_ENV=production&& node index.js"
+		"prod": "set NODE_ENV=production&& node index.js",
+		"postinstall": "node -e \"try { require('child_process').execSync('ffmpeg -version', {stdio: 'ignore'}); console.log('✓ FFmpeg est déjà installé'); } catch(e) { console.log('⚠️ FFmpeg n\\'est pas installé. Le mode vidéo ne fonctionnera pas.'); }\""
 	},
 	"author": "NTKhang",
 	"license": "MIT",
@@ -62,7 +65,14 @@
 		"type": "git",
 		"url": "git+https://github.com/ntkhang03/Goat-Bot-V2.git"
 	},
-	"keywords": [],
+	"keywords": [
+		"facebook",
+		"bot",
+		"goat",
+		"messenger",
+		"bank",
+		"economy"
+	],
 	"bugs": {
 		"url": "https://github.com/ntkhang03/Goat-Bot-V2/issues"
 	},
