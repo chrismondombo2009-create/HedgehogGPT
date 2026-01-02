@@ -8,7 +8,7 @@ const SERVER_URL = "https://fadil-ffinfo.vercel.app";
 module.exports = {
   config: {
     name: "ffinfo",
-    aliases: ["ff", "uid"],
+    aliases: ["ff", "freefire"],
     version: "Ultimate",
     role: 0,
     shortDescription: { en: "FF Full Stats", fr: "Stats Complètes FF" },
