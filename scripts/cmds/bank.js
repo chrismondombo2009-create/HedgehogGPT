@@ -40,7 +40,7 @@ async function getUserName(uid, api) {
     } catch { return `𝐔𝐬𝐞𝐫_${uid}`; }
 }
 
-function getBorder() { return "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"; }
+function getBorder() { return "==[🏦 𝐔𝐂𝐇𝐈𝐖𝐀 𝐁𝐀𝐍𝐊 🏦]==\n━━━━━━━━━━━━━━━━\n"; }
 
 const DISPLAY_MODES = { TEXT: 'text', IMAGE: 'image', VIDEO: 'video' };
 const loans = {};
