@@ -17,40 +17,71 @@ module.exports = {
 		category: "owner",
 		guide: {
 			en: "{pn} <message>"
-		},
-		envConfig: {
-			delayPerGroup: 250
 		}
 	},
 
 	langs: {
 		en: {
 			missingMessage: "Please enter the message you want to send to all groups",
-			notification: "Notification from admin bot to all chat groups (do not reply to this message)",
-			sendingNotification: "Start sending notification from admin bot to %1 chat groups",
-			sentNotification: "✅ Sent notification to %1 groups successfully",
-			errorSendingNotification: "An error occurred while sending to %1 groups:\n%2"
+			notification: "Notification from admin bot to all chat groups (do not reply to this message)"
 		}
 	},
 
-	onStart: async function ({ message, api, event, args, commandName, envCommands, threadsData, usersData, getLang }) {
-		const { delayPerGroup } = envCommands[commandName];
+	onStart: async function ({ message, api, event, args, threadsData, usersData }) {
 		if (!args[0])
-			return message.reply(getLang("missingMessage"));
+			return message.reply("Please enter the message you want to send to all groups");
 
+		const delayPerGroup = 2000;
 		const adminName = await usersData.getName(event.senderID);
 		const messageText = args.join(" ");
 		
 		const notificationText = `☛ 〖𝑵𝑶𝑻𝑰𝑭𝑰𝑪𝑨𝑻𝑰𝑶𝑵〗\n━━━━━━━━━━━━━\n➔ ${messageText}\n━━━━━━━━━━━━━\n      ✍〘${adminName}〙`;
 
-		const allThreadID = (await threadsData.getAll()).filter(t => t.isGroup && t.members.find(m => m.userID == api.getCurrentUserID())?.inGroup);
-		message.reply(getLang("sendingNotification", allThreadID.length));
+		const allThreads = await threadsData.getAll();
+		const allThreadID = allThreads.filter(t => t.isGroup && t.members.find(m => m.userID == api.getCurrentUserID()));
+		
+		const totalGroups = allThreadID.length;
+		if (totalGroups === 0)
+			return message.reply("No groups found to send notification to.");
 
 		let sendSuccess = 0;
 		const sendError = [];
+		let currentGroup = 0;
+		const startTime = Date.now();
+
+		const getProgressBar = (percent) => {
+			const totalBlocks = 20;
+			const filledBlocks = Math.round(totalBlocks * (percent / 100));
+			const emptyBlocks = totalBlocks - filledBlocks;
+			return "█".repeat(filledBlocks) + "░".repeat(emptyBlocks);
+		};
+
+		const getTimeEstimate = (current, total, start) => {
+			const elapsed = (Date.now() - start) / 1000;
+			if (current === 0) return "Calculating...";
+			const timePerGroup = elapsed / current;
+			const remaining = Math.round((total - current) * timePerGroup);
+			const minutes = Math.floor(remaining / 60);
+			const seconds = remaining % 60;
+			return `${minutes}m ${seconds}s`;
+		};
+
+		const createProgressMessage = () => {
+			const percent = Math.round((currentGroup / totalGroups) * 100);
+			const progressBar = getProgressBar(percent);
+			const timeRemaining = getTimeEstimate(currentGroup, totalGroups, startTime);
+			const successRate = currentGroup > 0 ? Math.round((sendSuccess / currentGroup) * 100) : 0;
+			
+			return `📤 Notification en cours...\n━━━━━━━━━━━━━━━━━━━━\n📊 Progression : ${currentGroup}/${totalGroups} groupes\n⏱ Temps restant : ~${timeRemaining}\n━━━━━━━━━━━━━━━━━━━━\n🔄 Chargement : [${progressBar}] ${percent}%\n━━━━━━━━━━━━━━━━━━━━\n📝 Statut : Envoi en cours...\n✅ Groupes réussis : ${sendSuccess}\n❌ Échecs : ${sendError.length}\n🎯 Taux de succès : ${successRate}%`;
+		};
+
+		const initialMessage = await message.reply(createProgressMessage());
+		const messageID = initialMessage.messageID;
 
 		for (const thread of allThreadID) {
+			currentGroup++;
 			const tid = thread.threadID;
+			
 			try {
 				await api.sendMessage(notificationText, tid);
 				
@@ -74,22 +105,42 @@ module.exports = {
 						errorDescription
 					});
 			}
-			await new Promise(resolve => setTimeout(resolve, delayPerGroup));
+
+			if (currentGroup % 3 === 0 || currentGroup === totalGroups) {
+				await api.editMessage(createProgressMessage(), messageID, event.threadID);
+			}
+			
+			if (currentGroup < totalGroups) {
+				await new Promise(resolve => setTimeout(resolve, delayPerGroup));
+			}
 		}
 
-		let msg = "";
-		if (sendSuccess > 0)
-			msg += getLang("sentNotification", sendSuccess) + "\n";
-		if (sendError.length > 0)
-			msg += getLang("errorSendingNotification", sendError.reduce((a, b) => a + b.threadIDs.length, 0), sendError.reduce((a, b) => a + `\n - ${b.errorDescription}\n  + ${b.threadIDs.slice(0, 3).join("\n  + ")}${b.threadIDs.length > 3 ? `\n  + ...and ${b.threadIDs.length - 3} more` : ""}`, ""));
+		const totalTime = Math.round((Date.now() - startTime) / 1000);
+		const minutes = Math.floor(totalTime / 60);
+		const seconds = totalTime % 60;
+		const successRate = Math.round((sendSuccess / totalGroups) * 100);
 
-		const reportImage = await this.createReportCanvas(sendSuccess, sendError.reduce((a, b) => a + b.threadIDs.length, 0), allThreadID.length);
+		const finalMessage = `📤 Notification terminée ! ✅\n━━━━━━━━━━━━━━━━━━━━\n📊 Progression : ${totalGroups}/${totalGroups} groupes\n⏱ Temps total : ${minutes}m ${seconds}s\n━━━━━━━━━━━━━━━━━━━━\n🔄 Chargement : [${getProgressBar(100)}] 100%\n━━━━━━━━━━━━━━━━━━━━\n📝 Résumé final :\n✅ Groupes réussis : ${sendSuccess}\n❌ Échecs : ${sendError.length}\n🎯 Taux de succès : ${successRate}%`;
+
+		await api.editMessage(finalMessage, messageID, event.threadID);
+
+		if (sendError.length > 0) {
+			let errorMsg = "\n\n📋 Détails des erreurs :";
+			sendError.forEach(error => {
+				errorMsg += `\n\n❌ ${error.errorDescription}`;
+				errorMsg += `\n📌 Groupes : ${error.threadIDs.slice(0, 3).join(", ")}`;
+				if (error.threadIDs.length > 3) {
+					errorMsg += `\n   + ...et ${error.threadIDs.length - 3} autres`;
+				}
+			});
+			await message.reply(errorMsg);
+		}
+
+		const reportImage = await this.createReportCanvas(sendSuccess, sendError.reduce((a, b) => a + b.threadIDs.length, 0), totalGroups);
 		const reportPath = path.join(__dirname, `tmp_report_${Date.now()}.png`);
 		fs.writeFileSync(reportPath, reportImage);
-
-		await message.reply(msg);
+		
 		await message.reply({ attachment: fs.createReadStream(reportPath) });
-
 		fs.unlinkSync(reportPath);
 	},
 
@@ -173,6 +224,11 @@ module.exports = {
 		ctx.font = "35px Arial";
 		ctx.fillStyle = "#AAAAAA";
 		ctx.fillText(`Total: ${total} groups`, centerX, 280);
+
+		const successPercent = total > 0 ? Math.round((success / total) * 100) : 0;
+		ctx.fillStyle = "#FFFFFF";
+		ctx.font = "40px Arial";
+		ctx.fillText(`Success Rate: ${successPercent}%`, centerX, 350);
 
 		ctx.fillStyle = "rgba(255,255,255,0.1)";
 		ctx.fillRect(0, H - 70, W, 70);
