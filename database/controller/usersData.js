@@ -197,26 +197,50 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 		}
 	}
 
-	async function getAvatarUrl(userID) {
-		if (isNaN(userID)) {
-			throw new CustomError({
-				name: "INVALID_USER_ID",
-				message: `The first argument (userID) must be a number, not ${typeof userID}`
-			});
-		}
-		try {
-			const user = await axios.post(`https://www.facebook.com/api/graphql/`, null, {
-				params: {
-					doc_id: "5341536295888250",
-					variables: JSON.stringify({ height: 500, scale: 1, userID, width: 500 })
-				}
-			});
-			return user.data.data.profile.profile_picture.uri;
-		}
-		catch (err) {
-			return "https://i.ibb.co/bBSpr5v/143086968-2856368904622192-1959732218791162458-n.png";
-		}
-	}
+async function getAvatarUrl(userID) {
+  if (isNaN(userID)) {
+    throw new CustomError({
+      name: "INVALID_USER_ID",
+      message: `The first argument (userID) must be a number, not ${typeof userID}`
+    });
+  }
+  
+  try {
+    const userInfo = await api.getUserInfo([userID]);
+    if (userInfo[userID]?.thumbSrc) {
+      return userInfo[userID].thumbSrc;
+    }
+  } catch (error) {}
+  
+  try {
+    const user = await axios.post(`https://www.facebook.com/api/graphql/`, null, {
+      params: {
+        doc_id: "5341536295888250",
+        variables: JSON.stringify({ height: 500, scale: 1, userID, width: 500 })
+      }
+    });
+    if (user.data?.data?.profile?.profile_picture?.uri) {
+      return user.data.data.profile.profile_picture.uri;
+    }
+  } catch (error) {}
+  
+  try {
+    if (api && typeof api.getAvatarUser === 'function') {
+      return new Promise((resolve, reject) => {
+        api.getAvatarUser(userID, [500, 500], (err, data) => {
+          if (err || !data || !data[userID]) {
+            reject(err);
+          } else {
+            resolve(data[userID]);
+          }
+        });
+      });
+    }
+  } catch (error) {}
+  
+  return "https://i.ibb.co/bBSpr5v/143086968-2856368904622192-1959732218791162458-n.png";
+}
+	
 
 	async function create_(userID, userInfo) {
 		const findInCreatingData = creatingUserData.find(u => u.userID == userID);
