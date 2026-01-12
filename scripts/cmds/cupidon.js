@@ -29,7 +29,6 @@ function drawWaveform(ctx, x, y, w, h, color, intensity) {
   ctx.globalAlpha = 0.5;
   ctx.shadowBlur = 15;
   ctx.shadowColor = color;
-  
   ctx.moveTo(x, y);
   for (let i = 0; i < w; i += 20) {
     const amplitude = (Math.random() - 0.5) * h * (intensity / 50);
@@ -47,13 +46,11 @@ function drawDigitalBar(ctx, x, y, w, h, percent, color) {
   ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
   ctx.lineWidth = 2;
   ctx.stroke();
-
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, 8);
   ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
   ctx.fill();
   ctx.clip();
-
   const barWidth = (percent / 100) * w;
   if (barWidth > 0) {
     const grad = ctx.createLinearGradient(x, y, x + barWidth, y);
@@ -63,7 +60,6 @@ function drawDigitalBar(ctx, x, y, w, h, percent, color) {
     ctx.shadowColor = color;
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, barWidth, h);
-
     ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
     ctx.lineWidth = 5;
     for (let i = 0; i < barWidth; i += 20) {
@@ -79,21 +75,37 @@ function drawDigitalBar(ctx, x, y, w, h, percent, color) {
 module.exports = {
   config: {
     name: "cupidon",
-    version: "12.0",
-    author: "ʚʆɞ Sømå Sønïč ʚʆɞ",
+    version: "12.2",
+    author: "Sømå Sønïč",
     role: 0,
-    shortDescription: { fr: "Cupidon Cyber Pulse - Ondes ECG et Interface Digitale" }
+    shortDescription: { fr: "Cupidon Cyber Pulse - Détection Ultra-Robuste" }
   },
 
   onStart: async function({ message, event, api }) {
-    const mentions = Object.keys(event.mentions);
-    if (!mentions.length) return message.reply("𝗠𝗲𝗻𝘁𝗶𝗼𝗻𝗻𝗲 𝗹𝗮 𝗽𝗲𝗿𝘀𝗼𝗻𝗻𝗲 💝");
+    let user2;
+
+    // --- SYSTÈME DE DÉTECTION ROBUSTE ---
+    const mentions = Object.keys(event.mentions || {});
+    const replyID = event.messageReply ? event.messageReply.senderID : null;
+    const args = event.body.split(/\s+/);
+
+    if (mentions.length > 0) {
+      user2 = mentions[0];
+    } else if (replyID) {
+      user2 = replyID;
+    } else if (args.length > 1 && /^\d+$/.test(args[1])) {
+      user2 = args[1];
+    }
+
+    if (!user2) return message.reply("𝗠𝗲𝗻𝘁𝗶𝗼𝗻𝗻𝗲 𝗹𝗮 𝗽𝗲𝗿𝘀𝗼𝗻𝗻𝗲 𝗼𝘂 𝗿𝗲́𝗽𝗼𝗻𝗱𝘀 𝗮̀ 𝘀𝗼𝗻 𝗺𝗲𝘀𝘀𝗮𝗴𝗲 💝");
 
     try {
       const user1 = event.senderID;
-      const user2 = mentions[0];
       const info1 = await api.getUserInfo(user1);
       const info2 = await api.getUserInfo(user2);
+      
+      if (!info1[user1] || !info2[user2]) throw new Error("Profil introuvable");
+
       const name1 = info1[user1].name.toUpperCase();
       const name2 = info2[user2].name.toUpperCase();
 
@@ -134,9 +146,7 @@ module.exports = {
 
       drawAvatar(av1, 280);
       drawAvatar(av2, 920);
-
       drawHeart(ctx, 600, 280, 140, themeColor, 1, true);
-      
       drawWaveform(ctx, 400, 780, 400, 60, themeColor, lovePercent);
 
       ctx.textAlign = "center";
@@ -162,12 +172,12 @@ module.exports = {
         body: `⚡ **CUPIDON** 𝗔𝗡𝗔𝗟𝗬𝗦𝗜𝗦\n────────────────\nVerdict : ${status}\nCompatibilité : ${lovePercent}%`,
         attachment: fs.createReadStream(filePath)
       });
-      
+
       fs.unlinkSync(filePath);
 
     } catch (error) {
       console.error(error);
-      message.reply("System error: pulse synchronization failed.");
+      message.reply("Erreur : Impossible de récupérer les profils. Réessaie en répondant au message de la personne.");
     }
   }
 };
