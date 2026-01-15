@@ -31,7 +31,7 @@
     },
     {
         "name": "fr",
-        "value": "1vqCXngEPwTuUeH8q.AWeAZ3pK2j9iD6iPwv8Njd9TnMrkAeP5BDiApy12komjIZUUxNs.BpZXjY..AAA.0.0.BpaA8C.AWcFcNNrEXCpJQyz2QiPkaXVVs8",
+        "value": "1OIflM836Xjj7FD88.AWf5yk9XXPtt-6pgSkh_RObaCyIJbLdiIN0vDy0S4TMOkaHLhBE.BpaDct..AAA.0.0.BpaDct.AWdB3BwwZf5rDub61_0SPT7Fqd0",
         "domain": ".facebook.com",
         "hostOnly": false,
         "path": "/",
@@ -41,7 +41,7 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1776203265.218,
+        "expirationDate": 1776213548.24,
         "storeId": null
     },
     {
@@ -61,7 +61,7 @@
     },
     {
         "name": "xs",
-        "value": "45%3AS1qXevvSEDnybQ%3A2%3A1768316886%3A-1%3A-1",
+        "value": "42%3AvKK-U4Wp8rx-_g%3A2%3A1768437533%3A-1%3A-1%3A%3AAcxCyEH_MkGOQ3-AxJ9GY3sLb4xguv2PCy5nyGBLgA",
         "domain": ".facebook.com",
         "hostOnly": false,
         "path": "/",
@@ -71,7 +71,7 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1799852887.208,
+        "expirationDate": 1799973548.24,
         "storeId": null
     },
     {
@@ -101,7 +101,7 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1799852887.208,
+        "expirationDate": 1799973548.24,
         "storeId": null
     },
     {
@@ -116,7 +116,7 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1768921681,
+        "expirationDate": 1769042331,
         "storeId": null
     },
     {
@@ -161,12 +161,12 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1802876887.208,
+        "expirationDate": 1802997534.033,
         "storeId": null
     },
     {
         "name": "wd",
-        "value": "843x1668",
+        "value": "843x1656",
         "domain": ".facebook.com",
         "hostOnly": false,
         "path": "/",
@@ -176,7 +176,7 @@
         "session": false,
         "firstPartyDomain": "",
         "partitionKey": null,
-        "expirationDate": 1768921681,
+        "expirationDate": 1769042330,
         "storeId": null
     },
     {
