@@ -21,19 +21,19 @@ function drawHeart(ctx, x, y, size, color, opacity = 1, glow = false) {
   ctx.restore();
 }
 
-function drawWaveform(ctx, x, y, w, h, color, intensity) {
+function drawECG(ctx, x, y, w, h, color, bpm) {
   ctx.save();
-  ctx.beginPath();
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
-  ctx.globalAlpha = 0.5;
-  ctx.shadowBlur = 15;
-  ctx.shadowColor = color;
+  ctx.beginPath();
   ctx.moveTo(x, y);
+  const segments = 10;
+  const speed = bpm / 60;
   for (let i = 0; i < w; i += 20) {
-    const amplitude = (Math.random() - 0.5) * h * (intensity / 50);
-    ctx.lineTo(x + i, y + amplitude);
-    ctx.lineTo(x + i + 10, y - amplitude * 1.5);
+    let dy = 0;
+    if (i % 60 === 0) dy = -h * speed;
+    else if (i % 60 === 10) dy = h * 0.5;
+    ctx.lineTo(x + i, y + dy);
   }
   ctx.stroke();
   ctx.restore();
@@ -60,14 +60,6 @@ function drawDigitalBar(ctx, x, y, w, h, percent, color) {
     ctx.shadowColor = color;
     ctx.fillStyle = grad;
     ctx.fillRect(x, y, barWidth, h);
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
-    ctx.lineWidth = 5;
-    for (let i = 0; i < barWidth; i += 20) {
-      ctx.beginPath();
-      ctx.moveTo(x + i, y);
-      ctx.lineTo(x + i + 10, y + h);
-      ctx.stroke();
-    }
   }
   ctx.restore();
 }
@@ -75,109 +67,115 @@ function drawDigitalBar(ctx, x, y, w, h, percent, color) {
 module.exports = {
   config: {
     name: "cupidon",
-    version: "12.2",
-    author: "Sømå Sønïč",
+    version: "13.0",
+    author: "Sømå Sønïč x Gemini",
     role: 0,
-    shortDescription: { fr: "Cupidon Cyber Pulse - Détection Ultra-Robuste" }
+    category: "game",
+    shortDescription: { fr: "Analyse cybernétique de compatibilité amoureuse" }
   },
 
   onStart: async function({ message, event, api }) {
+    const { threadID, senderID, body } = event;
+    const mentions = event.mentions || {};
+    
     let user2;
-
-    // --- SYSTÈME DE DÉTECTION ROBUSTE ---
-    const mentions = Object.keys(event.mentions || {});
-    const replyID = event.messageReply ? event.messageReply.senderID : null;
-    const args = event.body.split(/\s+/);
-
-    if (mentions.length > 0) {
-      user2 = mentions[0];
-    } else if (replyID) {
-      user2 = replyID;
-    } else if (args.length > 1 && /^\d+$/.test(args[1])) {
-      user2 = args[1];
+    const mentionKeys = Object.keys(mentions);
+    
+    if (mentionKeys.length > 0) {
+      user2 = mentionKeys[0];
+    } else if (event.messageReply) {
+      user2 = event.messageReply.senderID;
+    } else if (body && body.match(/\d{8,}/)) {
+      user2 = body.match(/\d{8,}/)[0];
+    } else {
+      const threadInfo = await api.getThreadInfo(threadID);
+      const members = threadInfo.participantIDs.filter(id => id !== senderID);
+      if (members.length === 0) {
+        return message.reply("𝗠𝗲𝗻𝘁𝗶𝗼𝗻𝗻𝗲 𝗹𝗮 𝗽𝗲𝗿𝘀𝗼𝗻𝗻𝗲 𝗼𝘂 𝗿𝗲́𝗽𝗼𝗻𝗱𝘀 𝗮̀ 𝘀𝗼𝗻 𝗺𝗲𝘀𝘀𝗮𝗴𝗲 💝");
+      }
+      user2 = members[Math.floor(Math.random() * members.length)];
+      await message.reply("🔍 Aucun signal cible... Scan du réseau pour trouver un partenaire aléatoire...");
     }
 
-    if (!user2) return message.reply("𝗠𝗲𝗻𝘁𝗶𝗼𝗻𝗻𝗲 𝗹𝗮 𝗽𝗲𝗿𝘀𝗼𝗻𝗻𝗲 𝗼𝘂 𝗿𝗲́𝗽𝗼𝗻𝗱𝘀 𝗮̀ 𝘀𝗼𝗻 𝗺𝗲𝘀𝘀𝗮𝗴𝗲 💝");
-
     try {
-      const user1 = event.senderID;
-      const info1 = await api.getUserInfo(user1);
+      const info1 = await api.getUserInfo(senderID);
       const info2 = await api.getUserInfo(user2);
       
-      if (!info1[user1] || !info2[user2]) throw new Error("Profil introuvable");
-
-      const name1 = info1[user1].name.toUpperCase();
-      const name2 = info2[user2].name.toUpperCase();
-
       const lovePercent = Math.floor(Math.random() * 101);
+      const bpm = 60 + Math.floor((lovePercent / 100) * 100);
+
+      let themeColor, status;
+      if (lovePercent >= 85) { themeColor = "#00ff88"; status = "FUSION QUANTIQUE"; }
+      else if (lovePercent >= 60) { themeColor = "#ff00ff"; status = "SURCHAUFFE CIRCUIT"; }
+      else if (lovePercent >= 30) { themeColor = "#00ccff"; status = "RÉSEAU SÉCURISÉ"; }
+      else { themeColor = "#ff4400"; status = "SYSTÈME INCOMPATIBLE"; }
+
       const canvas = createCanvas(1200, 900);
       const ctx = canvas.getContext("2d");
 
-      let themeColor, status;
-      if (lovePercent >= 80) { themeColor = "#00ff88"; status = "OSMOSE TOTALE"; }
-      else if (lovePercent >= 50) { themeColor = "#ff00ff"; status = "FRÉQUENCE STABLE"; }
-      else { themeColor = "#ff4400"; status = "SIGNAL FAIBLE"; }
-
-      ctx.fillStyle = "#030303";
+      ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, 1200, 900);
-      const bgGrad = ctx.createRadialGradient(600, 450, 0, 600, 450, 900);
-      bgGrad.addColorStop(0, "rgba(10, 30, 20, 1)");
-      bgGrad.addColorStop(1, "#000000");
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, 1200, 900);
+      
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      for(let i=0; i<1200; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,900); ctx.stroke(); }
+      for(let i=0; i<900; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(1200,i); ctx.stroke(); }
 
       const token = "6628568379%7Cc1e620fa708a1d5696fb991c1bde5662";
-      const av1 = await loadImage(`https://graph.facebook.com/${user1}/picture?width=512&height=512&access_token=${token}`);
+      const av1 = await loadImage(`https://graph.facebook.com/${senderID}/picture?width=512&height=512&access_token=${token}`);
       const av2 = await loadImage(`https://graph.facebook.com/${user2}/picture?width=512&height=512&access_token=${token}`);
 
       const drawAvatar = (img, x) => {
         ctx.save();
-        ctx.shadowBlur = 50;
-        ctx.shadowColor = themeColor;
-        ctx.beginPath();
-        ctx.arc(x, 320, 150, 0, Math.PI * 2);
-        ctx.clip();
+        ctx.shadowBlur = 40; ctx.shadowColor = themeColor;
+        ctx.beginPath(); ctx.arc(x, 320, 150, 0, Math.PI * 2); ctx.clip();
         ctx.drawImage(img, x - 150, 320 - 150, 300, 300);
         ctx.restore();
-        ctx.strokeStyle = themeColor;
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.strokeStyle = themeColor; ctx.lineWidth = 5; ctx.stroke();
       };
 
       drawAvatar(av1, 280);
       drawAvatar(av2, 920);
+
       drawHeart(ctx, 600, 280, 140, themeColor, 1, true);
-      drawWaveform(ctx, 400, 780, 400, 60, themeColor, lovePercent);
+      drawECG(ctx, 400, 750, 400, 50, themeColor, bpm);
 
       ctx.textAlign = "center";
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 120px monospace";
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 130px monospace";
       ctx.fillText(`${lovePercent}%`, 600, 520);
+      
+      ctx.font = "bold 40px monospace";
+      ctx.fillText(`${bpm} BPM`, 600, 810);
 
       drawDigitalBar(ctx, 250, 560, 700, 40, lovePercent, themeColor);
 
       ctx.font = "bold 60px monospace";
       ctx.fillStyle = themeColor;
-      ctx.letterSpacing = "10px";
-      ctx.fillText(status, 600, 720);
+      ctx.fillText(status, 600, 700);
 
-      ctx.font = "16px monospace";
-      ctx.fillStyle = "rgba(255,255,255,0.2)";
-      ctx.fillText(`ANALYSE_BIO_RYTHME: RUNNING...`, 600, 860);
+      ctx.textAlign = "left";
+      ctx.font = "14px monospace";
+      ctx.fillStyle = themeColor;
+      ctx.fillText(`> USER1_HASH: ${senderID.substring(0,10)}...`, 50, 830);
+      ctx.fillText(`> USER2_HASH: ${user2.substring(0,10)}...`, 50, 850);
+      ctx.fillText(`> SYNC_STATUS: OK`, 50, 870);
+      
+      ctx.textAlign = "right";
+      ctx.fillText(`OS_VER: 13.0_PULSE`, 1150, 850);
+      ctx.fillText(`ENCRYPTION: AES-256`, 1150, 870);
 
-      const filePath = path.join(__dirname, `cupidon_v12_${Date.now()}.png`);
+      const filePath = path.join(__dirname, `cupidon_${Date.now()}.png`);
       fs.writeFileSync(filePath, canvas.toBuffer());
 
       await message.reply({
-        body: `⚡ **CUPIDON** 𝗔𝗡𝗔𝗟𝗬𝗦𝗜𝗦\n────────────────\nVerdict : ${status}\nCompatibilité : ${lovePercent}%`,
+        body: `💘 **CUPIDON PULSE V13**\n━━━━━━━━━━━━━━━\n👤 **Cible** : ${info2[user2].name}\n📈 **Compatibilité** : ${lovePercent}%\n💓 **Rythme** : ${bpm} BPM\n🛡️ **Verdict** : ${status}`,
         attachment: fs.createReadStream(filePath)
       });
 
       fs.unlinkSync(filePath);
-
-    } catch (error) {
-      console.error(error);
-      message.reply("Erreur : Impossible de récupérer les profils. Réessaie en répondant au message de la personne.");
+    } catch (e) {
+      console.error(e);
+      message.reply("❌ Erreur de synchronisation des données biométriques.");
     }
   }
 };
