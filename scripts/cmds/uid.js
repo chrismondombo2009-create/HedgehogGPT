@@ -275,10 +275,10 @@ module.exports = {
       return;
     }
     
-    const { mentions } = event;
+    const mentions = event.mentions || {};
     if (Object.keys(mentions).length > 0) {
       for (const uid in mentions) {
-        const name = mentions[uid].replace("@", "");
+        const name = mentions[uid];
         const image = await createUidImage(name, uid, usersData, threadID);
         
         await message.reply(`╭─⌾🌿 UID SCANNÉ 🌿\n│👤 ${name}\n│🆔 ${uid}\n╰──────────⌾`);
