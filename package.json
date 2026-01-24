@@ -9,7 +9,7 @@
 	},
 	"dependencies": {
 		"@distube/ytdl-core": "^4.13.3",
-		"axios": "^1.4.0",
+		"axios": "^1.6.0", 
 		"bcrypt": "^5.0.1",
 		"bluebird": "^3.7.2",
 		"canvas": "^2.11.2",
@@ -22,6 +22,7 @@
 		"express-fileupload": "^1.4.0",
 		"express-rate-limit": "^6.5.2",
 		"express-session": "^1.17.3",
+		"fluent-ffmpeg": "^2.1.2",
 		"form-data": "^4.0.0",
 		"fs-extra": "^11.1.0",
 		"googleapis": "^100.0.0",
@@ -50,14 +51,14 @@
 		"tinyurl": "^1.1.7",
 		"totp-generator": "^0.0.13",
 		"websocket-stream": "^5.5.2",
-		"crypto": "^1.0.1",
-		"ffmpeg-static": "^5.1.0"
+		"crypto": "^1.0.1", 
+		"ffmpeg-static": "^5.1.0" 
 	},
 	"scripts": {
 		"start": "set NODE_ENV=&& node index.js",
 		"dev": "set NODE_ENV=development&& node index.js",
 		"prod": "set NODE_ENV=production&& node index.js",
-		"postinstall": "node -e \"try { require('child_process').execSync('ffmpeg -version', {stdio: 'ignore'}); console.log('✓ FFmpeg est déjà installé'); } catch(e) { console.log('⚠️ FFmpeg n\\'est pas installé. Le mode vidéo ne fonctionnera pas.'); }\""
+		"postinstall": "node -e \"try { require('child_process').execSync('ffmpeg -version', {stdio: 'ignore'}); console.log('✓ FFmpeg est déjà installé'); } catch(e) { console.log('⚠️ FFmpeg n\\\\'est pas installé. Le mode vidéo ne fonctionnera pas.'); }\""
 	},
 	"author": "NTKhang",
 	"license": "MIT",
