@@ -12,13 +12,11 @@ module.exports = {
     },
 
     langs: {
-        fr: {
+        en: {
             session1: "matin",
-            session2: "midi", 
+            session2: "midi",
             session3: "après-midi",
             session4: "soir",
-            leaveType1: "est enfin parti d'ici",
-            leaveType2: "est banni du groupe",
             funnyMessagesKicked: [
                 "{userName} vient de prendre un aller simple pour la sortie 🗿",
                 "{userName} s'est fait montrer la porte 😩",
@@ -67,13 +65,6 @@ module.exports = {
                 
                 let leaveMessage = randomFunnyMessage.replace(/\{userName\}/g, userName);
 
-                const form = {
-                    mentions: [{
-                        tag: userName,
-                        id: leftParticipantFbId
-                    }]
-                };
-
                 leaveMessage = leaveMessage
                     .replace(/\{threadName\}/g, threadName)
                     .replace(/\{time\}/g, hours)
@@ -86,7 +77,9 @@ module.exports = {
                                 getLang("session4")
                     );
 
-                form.body = "◆ ▬▬▬▬ ❴✪❵ ▬▬▬▬ ◆\n\n" + leaveMessage + "\n\n◆ ▬▬▬▬ ❴✪❵ ▬▬▬▬ ◆";
+                const bodyText = "◆ ▬▬▬▬ ❴✪❵ ▬▬▬▬ ◆\n\n" + leaveMessage + "\n\n◆ ▬▬▬▬ ❴✪❵ ▬▬▬▬ ◆";
+
+                await message.send({ body: bodyText });
 
                 try {
                     const threadInfo = await api.getThreadInfo(threadID);
@@ -105,10 +98,9 @@ module.exports = {
                         leaveMessage
                     );
                     
-                    const imagePath = path.join(__dirname, `leave_${leftParticipantFbId}_${Date.now()}.png`);
+                    const imagePath = path.join(__dirname, `leave_\( {leftParticipantFbId}_ \){Date.now()}.png`);
                     fs.writeFileSync(imagePath, leaveImage);
 
-                    await message.send(form);
                     await message.send({ 
                         body: " ",
                         attachment: fs.createReadStream(imagePath) 
@@ -124,11 +116,13 @@ module.exports = {
                             acc.push(drive.getFile(file, "stream"));
                             return acc;
                         }, []);
-                        form.attachment = (await Promise.allSettled(attachments))
+                        const processedAttachments = (await Promise.allSettled(attachments))
                             .filter(({ status }) => status == "fulfilled")
                             .map(({ value }) => value);
+                        if (processedAttachments.length > 0) {
+                            await message.send({ attachment: processedAttachments });
+                        }
                     }
-                    message.send(form);
                 }
             }.bind(this);
     },
