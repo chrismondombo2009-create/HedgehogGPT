@@ -11,6 +11,51 @@ if (!global.detectiveLists) global.detectiveLists = new Map();
 if (!global.detectiveScenarios) global.detectiveScenarios = new Map();
 if (!global.detectiveStates) global.detectiveStates = new Map();
 
+const boldMap = {
+  'A': '𝗔', 'B': '𝗕', 'C': '𝗖', 'D': '𝗗', 'E': '𝗘', 'F': '𝗙',
+  'G': '𝗚', 'H': '𝗛', 'I': '𝗜', 'J': '𝗝', 'K': '𝗞', 'L': '𝗟',
+  'M': '𝗠', 'N': '𝗡', 'O': '𝗢', 'P': '𝗣', 'Q': '𝗤', 'R': '𝗥',
+  'S': '𝗦', 'T': '𝗧', 'U': '𝗨', 'V': '𝗩', 'W': '𝗪', 'X': '𝗫',
+  'Y': '𝗬', 'Z': '𝗭',
+  'a': '𝗮', 'b': '𝗯', 'c': '𝗰', 'd': '𝗱', 'e': '𝗲', 'f': '𝗳',
+  'g': '𝗴', 'h': '𝗵', 'i': '𝗶', 'j': '𝗷', 'k': '𝗸', 'l': '𝗹',
+  'm': '𝗺', 'n': '𝗻', 'o': '𝗼', 'p': '𝗽', 'q': '𝗾', 'r': '𝗿',
+  's': '𝘀', 't': '𝘁', 'u': '𝘂', 'v': '𝘃', 'w': '𝘄', 'x': '𝘅',
+  'y': '𝘆', 'z': '𝘇'
+};
+
+const italicMap = {
+  'A': '𝘈', 'B': '𝘉', 'C': '𝘊', 'D': '𝘋', 'E': '𝘌', 'F': '𝘍',
+  'G': '𝘎', 'H': '𝘏', 'I': '𝘐', 'J': '𝘑', 'K': '𝘒', 'L': '𝘓',
+  'M': '𝘔', 'N': '𝘕', 'O': '𝘖', 'P': '𝘗', 'Q': '𝘘', 'R': '𝘙',
+  'S': '𝘚', 'T': '𝘛', 'U': '𝘜', 'V': '𝘝', 'W': '𝘞', 'X': '𝘟',
+  'Y': '𝘠', 'Z': '𝘡',
+  'a': '𝘢', 'b': '𝘣', 'c': '𝘤', 'd': '𝘥', 'e': '𝘦', 'f': '𝘧',
+  'g': '𝘨', 'h': '𝘩', 'i': '𝘪', 'j': '𝘫', 'k': '𝘬', 'l': '𝘭',
+  'm': '𝘮', 'n': '𝘯', 'o': '𝘰', 'p': '𝘱', 'q': '𝘲', 'r': '𝘳',
+  's': '𝘴', 't': '𝘵', 'u': '𝘶', 'v': '𝘷', 'w': '𝘸', 'x': '𝘹',
+  'y': '𝘺', 'z': '𝘻'
+};
+
+function transformMarkdownFancy(text) {
+  if (!text) return "";
+  let result = text;
+  result = result.replace(/\*\*(.*?)\*\*/g, (match, content) => {
+    return content.split('').map(char => boldMap[char] || char).join('');
+  });
+  result = result.replace(/\*(.*?)\*/g, (match, content) => {
+    return content.split('').map(char => italicMap[char] || char).join('');
+  });
+  result = result.replace(/^# (.*)/gm, '🔸 $1');
+  result = result.replace(/^## (.*)/gm, '  • $1');
+  result = result.replace(/^### (.*)/gm, '    › $1');
+  result = result.replace(/`(.*?)`/g, '「$1」');
+  result = result.replace(/^- (.*)/gm, '• $1');
+  result = result.replace(/^\* (.*)/gm, '• $1');
+  result = result.replace(/\n{3,}/g, '\n\n');
+  return result.trim();
+}
+
 module.exports = {
   config: {
     name: "detective",
@@ -495,7 +540,6 @@ module.exports = {
 
 async function processAction(message, sessionKey, payload) {
   try {
-    message.reply("⏳ 𝐓𝐫𝐚𝐢𝐭𝐞𝐦𝐞𝐧𝐭 𝐞𝐧 𝐜𝐨𝐮𝐫𝐬...");
     let response;
     if (payload.cmd === "addfunds") {
       response = await axios.post(`${API_URL}/game/${sessionKey}/addfunds`, {
@@ -506,6 +550,7 @@ async function processAction(message, sessionKey, payload) {
       response = await axios.post(`${API_URL}/game/${sessionKey}/action`, payload);
     }
     const data = response.data;
+
     if (data.status === "VICTOIRE" || data.status === "ÉCHEC" || data.status === "TEMPS ÉCOULÉ") {
       const partner = Array.from(global.detectiveSessions.entries()).find(([k, v]) => v === sessionKey && k !== payload.pid);
       if (partner) {
@@ -519,41 +564,53 @@ async function processAction(message, sessionKey, payload) {
       global.detectiveScenarios.delete(sessionKey);
       global.detectiveStates.delete(sessionKey);
     }
+
     if (data.status === "VICTOIRE") {
       const winText = `◆━━━━━▣✦▣━━━━━━◆\n${data.narrative || "𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 !"}\n\n🎯 𝐒𝐜𝐨𝐫𝐞: ${data.score}\n💰 𝐏𝐫𝐢𝐱𝐞: ${data.prize}$\n◆━━━━━▣✦▣━━━━━━◆\n          ➔〘𝐇𝐞𝐝𝐠𝐞𝐡𝐨𝐠𝄞𝐆𝐏𝐓〙`;
       return message.reply(winText);
     }
+
     if (data.status === "ÉCHEC" || data.status === "TEMPS ÉCOULÉ") {
       const failText = `◆━━━━━▣✦▣━━━━━━◆\n${data.narrative || "𝐏𝐚𝐫𝐭𝐢𝐞 𝐭𝐞𝐫𝐦𝐢𝐧𝐞́𝐞."}\n\n❌ 𝐋𝐞 𝐯𝐫𝐚𝐢 𝐜𝐨𝐮𝐩𝐚𝐛𝐥𝐞 𝐞́𝐭𝐚𝐢𝐭 : ${data.culprit || "Inconnu"}\n◆━━━━━▣✦▣━━━━━━◆\n          ➔〘𝐇𝐞𝐝𝐠𝐞𝐡𝐨𝐠𝄞𝐆𝐏𝐓〙`;
       return message.reply(failText);
     }
-    const narrative = data.narrative || "𝐀𝐮𝐜𝐮𝐧𝐞 𝐫é𝐩𝐨𝐧𝐬𝐞.";
+
+    let narrative = transformMarkdownFancy(data.narrative || "𝐀𝐮𝐜𝐮𝐧𝐞 𝐫é𝐩𝐨𝐧𝐬𝐞.");
     const state = data.state;
+
+    let finalText = narrative + "\n\n";
+
     if (state) {
-      const imageBuffer = await drawCaseFile3D(narrative, state);
+      finalText += "📊 **RÉSUMÉ**\n";
+      finalText += `📍 Lieu: ${state.current_location || "?"}\n`;
+      finalText += `⏱️ Temps: ${state.time_left || 0} min\n`;
+      finalText += `💰 Budget: ${state.police_budget || 0}$\n`;
+      finalText += `💳 Perso: ${state.personal_funds?.[payload.pid] || 0}$\n`;
+      finalText += `🏙️ Confiance: ${state.city_trust || 0}%\n`;
+      finalText += `⭐ Réputation: ${state.reputation || 0}%\n`;
+
+      if (state.inventory && state.inventory.length > 0) {
+        finalText += `\n🎒 Inventaire (${state.inventory.length}): ${state.inventory.slice(0, 3).join(", ")}`;
+        if (state.inventory.length > 3) finalText += `...`;
+      }
+
+      finalText += `\n\n◆━━━━━▣✦▣━━━━━━◆\n          ➔〘𝐇𝐞𝐝𝐠𝐞𝐡𝐨𝐠𝄞𝐆𝐏𝐓〙`;
+      await message.reply(finalText);
+
+      const imageBuffer = await generateVisualCaseFile(state);
       const imagePath = path.join(__dirname, `detective_${Date.now()}.png`);
       fs.writeFileSync(imagePath, imageBuffer);
-      let formattedText = `◆━━━━━▣✦▣━━━━━━◆\n${narrative}\n\n📊 𝐑𝐄́𝐒𝐔𝐌𝐄:\n`;
-      formattedText += `📍 Lieu: ${state.current_location || "Inconnu"}\n`;
-      formattedText += `⏱️ Temps: ${state.time_left || 0} min\n`;
-      formattedText += `💰 Police: ${state.police_budget || 0}$\n`;
-      formattedText += `💳 Perso: ${state.personal_funds?.[payload.pid] || 0}$\n`;
-      formattedText += `🏙️ Confiance: ${state.city_trust || 0}%\n`;
-      formattedText += `⭐ Réputation: ${state.reputation || 0}%\n`;
-      if (state.inventory && state.inventory.length > 0) {
-        formattedText += `\n🎒 Inventaire (${state.inventory.length}): ${state.inventory.slice(0, 3).join(", ")}`;
-        if (state.inventory.length > 3) formattedText += `...`;
-      }
-      formattedText += `\n◆━━━━━▣✦▣━━━━━━◆\n          ➔〘𝐇𝐞𝐝𝐠𝐞𝐡𝐨𝐠𝄞𝐆𝐏𝐓〙`;
+
       await message.reply({
-        body: formattedText,
+        body: "📸 **DOSSIER VISUEL**",
         attachment: fs.createReadStream(imagePath)
       });
+
       fs.unlinkSync(imagePath);
       global.detectiveStates.set(sessionKey, state);
     } else {
-      const formattedText = `◆━━━━━▣✦▣━━━━━━◆\n${narrative}\n◆━━━━━▣✦▣━━━━━━◆\n          ➔〘𝐇𝐞𝐝𝐠𝐞𝐡𝐨𝐠𝄞𝐆𝐏𝐓〙`;
-      message.reply(formattedText);
+      finalText += `\n◆━━━━━▣✦▣━━━━━━◆\n          ➔〘𝐇𝐞𝐝𝐠𝐞𝐡𝐨𝐠𝄞𝐆𝐏𝐓〙`;
+      message.reply(finalText);
     }
   } catch (error) {
     console.error("Erreur API:", error.response?.data || error.message);
@@ -587,18 +644,21 @@ function findBestMatch(input, list) {
   return null;
 }
 
-async function drawCaseFile3D(text, state) {
+async function generateVisualCaseFile(state) {
   const width = 1920;
   const height = 1080;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
+
   await create3DBloodTexture(ctx, width, height);
+
   const gradient = ctx.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, "rgba(10, 10, 10, 0.95)");
   gradient.addColorStop(0.5, "rgba(20, 20, 20, 0.90)");
   gradient.addColorStop(1, "rgba(5, 5, 5, 0.95)");
   ctx.fillStyle = gradient;
   ctx.fillRect(80, 60, width - 160, height - 120);
+
   ctx.shadowColor = "#8B0000";
   ctx.shadowBlur = 20;
   ctx.shadowOffsetX = 5;
@@ -606,11 +666,13 @@ async function drawCaseFile3D(text, state) {
   ctx.strokeStyle = "#8B0000";
   ctx.lineWidth = 6;
   ctx.strokeRect(85, 65, width - 170, height - 130);
+
   ctx.shadowBlur = 40;
   ctx.shadowColor = "#B22222";
   ctx.fillStyle = "#B22222";
   ctx.font = "bold 72px 'Arial Black', Gadget, sans-serif";
   ctx.fillText("DOSSIER CRIMINEL", width/2 - 360, 140);
+
   ctx.shadowBlur = 15;
   ctx.shadowColor = "#8B0000";
   const drawGlowingText = (text, x, y, size, color) => {
@@ -620,29 +682,23 @@ async function drawCaseFile3D(text, state) {
     ctx.font = `bold ${size}px Arial`;
     ctx.fillText(text, x, y);
   };
+
   drawGlowingText(`📍 LIEU: ${state.current_location || "INCONNU"}`, 100, 220, 32, "#8B0000");
   drawGlowingText(`⏱️ TEMPS: ${state.time_left || 0} min`, 100, 270, 32, "#8B0000");
   drawGlowingText(`💰 BUDGET POLICE: ${state.police_budget || 0}$`, 100, 320, 32, "#8B0000");
   drawGlowingText(`🏙️ CONFIANCE VILLE: ${state.city_trust || 0}%`, width/2 + 100, 220, 32, "#FFD700");
   drawGlowingText(`⭐ RÉPUTATION: ${state.reputation || 0}%`, width/2 + 100, 270, 32, "#FFD700");
+
   const personalFunds = state.personal_funds ? Object.values(state.personal_funds).reduce((a, b) => a + b, 0) : 0;
   drawGlowingText(`💳 FONDS PERSONNELS: ${personalFunds}$`, width/2 + 100, 320, 32, "#FFD700");
-  ctx.shadowBlur = 5;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.font = "28px 'Courier New', monospace";
-  const lines = splitText(text, 80);
-  let y = 400;
-  for (let i = 0; i < Math.min(lines.length, 12); i++) {
-    ctx.fillText(lines[i], 100, y);
-    y += 40;
-  }
+
   if (state.stress) {
     ctx.fillStyle = "#DC143C";
     ctx.font = "bold 38px Arial";
     ctx.fillText("📈 NIVEAU DE STRESS DES SUSPECTS", width/2 - 250, 850);
     ctx.font = "24px Arial";
     let x = 100;
-    y = 920;
+    let y = 920;
     const suspects = Object.entries(state.stress);
     for (let i = 0; i < Math.min(suspects.length, 5); i++) {
       const [name, stress] = suspects[i];
@@ -664,6 +720,7 @@ async function drawCaseFile3D(text, state) {
       x += 320;
     }
   }
+
   if (state.inventory && state.inventory.length > 0) {
     ctx.fillStyle = "#1E90FF";
     ctx.font = "bold 30px Arial";
@@ -671,6 +728,7 @@ async function drawCaseFile3D(text, state) {
     ctx.font = "26px Arial";
     ctx.fillText(state.inventory.slice(0, 6).join(", "), 280, 1000);
   }
+
   await add3DEffects(ctx, width, height);
   return canvas.toBuffer();
 }
@@ -783,20 +841,4 @@ async function add3DEffects(ctx, width, height) {
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
-}
-
-function splitText(text, maxLength) {
-  const words = text.split(" ");
-  const lines = [];
-  let currentLine = "";
-  for (const word of words) {
-    if ((currentLine + " " + word).length <= maxLength) {
-      currentLine += (currentLine ? " " : "") + word;
-    } else {
-      if (currentLine) lines.push(currentLine);
-      currentLine = word;
-    }
-  }
-  if (currentLine) lines.push(currentLine);
-  return lines;
 }
