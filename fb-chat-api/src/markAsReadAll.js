@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function markAsReadAll(callback) {
@@ -41,7 +41,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         return callback();
       })
       .catch(function (err) {
-        log.error("markAsReadAll", err);
+        utils.error("markAsReadAll", err);
         return callback(err);
       });
 

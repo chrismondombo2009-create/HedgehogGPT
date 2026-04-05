@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 function getExtension(original_extension, filename = "") {
   if (original_extension) {
@@ -635,7 +635,7 @@ module.exports = function (defaultFuncs, api, ctx) {
       };
     }
 
-    // `queries` has to be a string. I couldn't tell from the dev console. This
+    // `queries` has to be a string. I couldn't tell from the dev utils. This
     // took me a really long time to figure out. I deserve a cookie for this.
     const form = {
       av: ctx.globalOptions.pageID,
@@ -671,7 +671,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         callback(null, formatMessagesGraphQLResponse(resData[0]));
       })
       .catch(function (err) {
-        log.error("getThreadHistoryGraphQL", err);
+        utils.error("getThreadHistoryGraphQL", err);
         return callback(err);
       });
 

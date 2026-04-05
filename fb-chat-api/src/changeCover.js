@@ -1,7 +1,6 @@
 'use strict';
 
-var utils = require('../utils.js');
-var log = require('npmlog');
+var utils = require('../utils');
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function changeCover(image, callback) {
@@ -17,7 +16,7 @@ module.exports = function (defaultFuncs, api, ctx) {
     if (typeof callback == 'function') cb = callback;
     if (!utils.isReadableStream(image)) {
       var error = 'image should be a readable stream, not ' + utils.getType(image);
-      log.error('changeCover', error);
+      utils.error('changeCover', error);
       cb(error);
     }
     else {
@@ -63,7 +62,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           return cb(null, res.data.user_update_cover_photo.user.cover_photo.photo.url);
         })
         .catch(function (err) {
-          log.error('changeCover', err);
+          utils.error('changeCover', err);
           return cb(err);
         });
     }

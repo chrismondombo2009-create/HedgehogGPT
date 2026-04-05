@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return async function markAsRead(threadID, read, callback) {
@@ -48,10 +48,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 
       if (resData.error) {
         const err = resData.error;
-        log.error("markAsRead", err);
-        if (utils.getType(err) == "Object" && err.error === "Not logged in.") {
-          ctx.loggedIn = false;
-        }
+        utils.error("markAsRead", err);
         callback(err);
         return err;
       }

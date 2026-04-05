@@ -7,18 +7,18 @@
  * Example:
  * api.follow("100090794779367", true); // Set true to follow, false if otherwise.
  */
+ 
+ //Fixed by Neth
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function follow(senderID, boolean, callback) {
-    if (!ctx.mqttClient) {
+    /*if (!ctx.mqttClient) {
       throw new Error("Not connected to MQTT");
-    }
-
+    }*/
     let form;
-
     if (boolean) {
       form = {
-        av: ctx.userID || ctx.i_userID,
+        av: ctx.userID,
         fb_api_req_friendly_name: "CometUserFollowMutation",
         fb_api_caller_class: "RelayModern",
         doc_id: "25472099855769847",
@@ -30,7 +30,7 @@ module.exports = function (defaultFuncs, api, ctx) {
             subscribe_location: "PROFILE",
             subscribee_id: senderID,
             tracking: null,
-            actor_id: ctx.userID || ctx.i_userID,
+            actor_id: ctx.userID,
             client_mutation_id: "1",
           },
           scale: 1,
@@ -38,7 +38,7 @@ module.exports = function (defaultFuncs, api, ctx) {
       };
     } else {
       form = {
-        av: ctx.userID || ctx.i_userID,
+        av: ctx.userID,
         fb_api_req_friendly_name: "CometUserUnfollowMutation",
         fb_api_caller_class: "RelayModern",
         doc_id: "25472099855769847",
@@ -51,7 +51,7 @@ module.exports = function (defaultFuncs, api, ctx) {
             subscribe_location: "PROFILE",
             tracking: null,
             unsubscribee_id: senderID,
-            actor_id: ctx.userID || ctx.i_userID,
+            actor_id: ctx.userID,
             client_mutation_id: "10",
           },
           scale: 1,

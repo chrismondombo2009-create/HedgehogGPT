@@ -2,7 +2,7 @@
 'use strict';
 
 var utils = require('../utils.js');
-var log = require('npmlog');
+//NethWs3Dev
 
 module.exports = function (http, api, ctx) {
   function formatData(res) {
@@ -44,7 +44,7 @@ module.exports = function (http, api, ctx) {
         return cb(null, res.data.sticker_search.sticker_results.edges.map(formatData));
       })
       .catch(function (err) {
-        log.error('searchStickers', err);
+        utils.error('searchStickers', err);
         return cb(err);
       });
     return returnPromise;

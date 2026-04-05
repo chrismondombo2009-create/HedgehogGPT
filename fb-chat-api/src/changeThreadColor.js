@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function changeThreadColor(color, threadID, callback) {
@@ -34,7 +34,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           doc_id: "1727493033983591",
           query_params: {
             data: {
-              actor_id: ctx.i_userID || ctx.userID,
+              actor_id: ctx.userID,
               client_mutation_id: "0",
               source: "SETTINGS",
               theme_id: validatedColor,
@@ -56,7 +56,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         return callback();
       })
       .catch(function (err) {
-        log.error("changeThreadColor", err);
+        utils.error("changeThreadColor", err);
         return callback(err);
       });
 

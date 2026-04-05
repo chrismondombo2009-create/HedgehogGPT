@@ -1,7 +1,6 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
 
 function formatEventReminders(reminder) {
   return {
@@ -261,7 +260,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         );
       })
       .catch((err) => {
-        log.error("getThreadList", err);
+        utils.error("getThreadList", err);
         return callback(err);
       });
 

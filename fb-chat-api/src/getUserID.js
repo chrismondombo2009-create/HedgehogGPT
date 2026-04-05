@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 function formatData(data) {
   return {
@@ -37,7 +37,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 
     const form = {
       value: name.toLowerCase(),
-      viewer: ctx.i_userID || ctx.userID,
+      viewer: ctx.userID,
       rsp: "search",
       context: "search",
       path: "/home.php",
@@ -57,7 +57,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         callback(null, data.map(formatData));
       })
       .catch(function (err) {
-        log.error("getUserID", err);
+        utils.error("getUserID", err);
         return callback(err);
       });
 

@@ -1,7 +1,6 @@
 'use strict';
 
 var utils = require('../utils');
-var log = require('npmlog');
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function getAccess(authCode = '', callback) {
@@ -83,7 +82,7 @@ module.exports = function (defaultFuncs, api, ctx) {
                   return pCb(null, res[1][1]);
                 })
                 .catch(function (err) {
-                  log.error('getAccess', err.error || err);
+                  utils.error('getAccess', err.error || err);
                   return pCb(err);
                 });
     
@@ -103,7 +102,7 @@ module.exports = function (defaultFuncs, api, ctx) {
             }
         })
         .catch(function (err) {
-          log.error('getAccess', typeof callback == 'function' ? (err.error || err) : err);
+          utils.error('getAccess', typeof callback == 'function' ? (err.error || err) : err);
           return cb(err);
         });
 

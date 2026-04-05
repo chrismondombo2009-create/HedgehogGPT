@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function changeThreadEmoji(emoji, threadID, callback) {
@@ -46,7 +46,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         return callback();
       })
       .catch(function (err) {
-        log.error("changeThreadEmoji", err);
+        utils.error("changeThreadEmoji", err);
         return callback(err);
       });
 

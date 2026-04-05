@@ -1,6 +1,4 @@
 var utils = require("../utils");
-var log = require("npmlog");
-var bluebird = require("bluebird");
 
 module.exports = function (defaultFuncs, api, ctx) {
   function uploadAttachment(attachments, callback) {
@@ -45,13 +43,12 @@ module.exports = function (defaultFuncs, api, ctx) {
     }
 
     // resolve all promises
-    bluebird
-      .all(uploads)
+    Promise.all(uploads)
       .then(function (resData) {
         callback(null, resData);
       })
       .catch(function (err) {
-        log.error("uploadAttachment", err);
+        utils.error("uploadAttachment", err);
         return callback(err);
       });
   }
@@ -146,14 +143,14 @@ module.exports = function (defaultFuncs, api, ctx) {
         const offset = msg.body.indexOf(tag, mention.fromIndex || 0);
 
         if (offset < 0) {
-          log.warn(
+          utils.warn(
             "handleMention",
             'Mention for "' + tag + '" not found in message string.',
           );
         }
 
         if (mention.id == null) {
-          log.warn("handleMention", "Mention id should be non-null.");
+          utils.warn("handleMention", "Mention id should be non-null.");
         }
 
         const id = mention.id || 0;
@@ -209,17 +206,14 @@ module.exports = function (defaultFuncs, api, ctx) {
       task.payload = JSON.stringify(task.payload);
     });
     form.payload = JSON.stringify(form.payload);
-    console.log(global.jsonStringifyColor(form, null, 2));
-
     return mqttClient.publish(
       "/ls_req",
       JSON.stringify(form),
       function (err, data) {
         if (err) {
-          console.error("Error publishing message: ", err);
+          utils.error("Error publishing message: ", err);
           callback(err);
         } else {
-          console.log("Message published successfully with data: ", data);
           callback(null, data);
         }
       },

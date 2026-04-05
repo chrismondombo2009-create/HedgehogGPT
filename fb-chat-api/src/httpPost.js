@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function httpPost(url, form, customHeader, callback, notAPI) {
@@ -45,7 +45,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           callback(null, resData.body.toString());
         })
         .catch(function (err) {
-          log.error("httpPost", err);
+          utils.error("httpPost", err);
           return callback(err);
         });
     } else {
@@ -53,13 +53,12 @@ module.exports = function (defaultFuncs, api, ctx) {
         .post(url, ctx.jar, form, {}, customHeader)
         .then(function (resData) {
           callback(null, resData.body.toString());
-        })
+          })
         .catch(function (err) {
-          log.error("httpPost", err);
+          utils.error("httpPost", err);
           return callback(err);
         });
     }
-
     return returnPromise;
   };
 };

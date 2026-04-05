@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   function handleUpload(image, callback) {
@@ -36,7 +36,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         callback(null, resData);
       })
       .catch(function (err) {
-        log.error("handleUpload", err);
+        utils.error("handleUpload", err);
         return callback(err);
       });
   }
@@ -74,7 +74,7 @@ module.exports = function (defaultFuncs, api, ctx) {
     const form = {
       client: "mercury",
       action_type: "ma-type:log-message",
-      author: "fbid:" + (ctx.i_userID || ctx.userID),
+      author: "fbid:" + (ctx.userID),
       author_email: "",
       ephemeral_ttl_mode: "0",
       is_filtered_content: false,
@@ -125,7 +125,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           return callback();
         })
         .catch(function (err) {
-          log.error("changeGroupImage", err);
+          utils.error("changeGroupImage", err);
           return callback(err);
         });
     });

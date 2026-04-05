@@ -1,56 +1,41 @@
 "use strict";
 
 var utils = require('../utils');
-var log = require('npmlog');
-
-const ACCESS_TOKEN = "6628568379%7Cc1e620fa708a1d5696fb991c1bde5662";
+//NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
-  
   function handleAvatar(userIDs, height, width) {
     var cb;
     var uploads = [];
-    
     var rtPromise = new Promise(function (resolve, reject) {
       cb = (error, data) => data ? resolve(data) : reject(error);
     });
 
+    // Getting User Data From GraphAPI In The Loop
     userIDs.map(function (v) {
-      var url = `https://graph.facebook.com/${v}/picture?height=${height}&width=${width}&redirect=false&access_token=${ACCESS_TOKEN}`;
-      
       var mainPromise = defaultFuncs
-        .get(url, ctx.jar)
+        .get(`https://graph.facebook.com/${v}/picture?height=${height}&width=${width}&redirect=false&access_token=` + ctx.access_token, ctx.jar)
+        .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
         .then(function (res) {
-          try {
-            var data = JSON.parse(res.body);
-            return {
-              userID: v,
-              url: data.data.url
-            };
-          } catch (e) {
-            return {
-              userID: v,
-              url: `https://graph.facebook.com/${v}/picture?height=${height}&width=${width}&access_token=${ACCESS_TOKEN}`
-            };
+          return { 
+            userID: v, 
+            url: res.data.url 
           }
         })
         .catch(function (err) {
           return cb(err);
         });
-        
       uploads.push(mainPromise);
     });
 
+    // resolve all promises
     Promise
       .all(uploads)
       .then(function (res) {
-        var resultObject = res.reduce(function (Obj, item) {
-          if (item && item.userID) {
-            Obj[item.userID] = item.url;
-          }
+        return cb(null, res.reduce(function (Obj, { userID, url }) {
+          Obj[userID] = url;
           return Obj;
-        }, {});
-        return cb(null, resultObject);
+        }, {}));
       })
       .catch(function (err) {
         return cb(err);
@@ -58,7 +43,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 
     return rtPromise;
   }
-
+  
   return function getAvatarUser(userIDs, size = [1500, 1500], callback) {
     var cb;
     var rtPromise = new Promise(function (resolve, reject) {
@@ -71,21 +56,23 @@ module.exports = function (defaultFuncs, api, ctx) {
       callback = size;
       size = [1500, 1500];
     }
-    
     if (typeof callback == 'function') cb = callback;
     if (!Array.isArray(userIDs)) userIDs = [userIDs];
-    
     var [height, width] = size;
-
+    if (!ctx.access_token) {
+      utils.error('getAvatarUser', 'Cant get access_token');
+      return cb('Cant get access_token');
+    };
+    
     handleAvatar(userIDs, height, width)
       .then(function (res) {
         return cb(null, res);
       })
       .catch(function (err) {
-        log.error('getAvatarUser', err);
+        utils.error('getAvatarUser', err);
         return cb(err);
       });
 
     return rtPromise;
   }
-};
+}

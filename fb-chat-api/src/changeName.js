@@ -1,7 +1,6 @@
 "use strict";
 
-var utils = require('./../utils.js');
-var log = require('npmlog');
+var utils = require('../utils');
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function changeName(input, format, callback) {
@@ -27,7 +26,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 
     var { first_name, middle_name, last_name } = input;
     if (!first_name || !last_name) {
-      log.error('changeName', 'name is not be accepted');
+      utils.error('changeName', 'name is not be accepted');
       return cb('name is not be accepted');
     }
 
@@ -70,7 +69,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         return cb();
       })
       .catch(function (err) {
-        log.error('changeName', err);
+        utils.error('changeName', err);
         return cb(err);
       });
 

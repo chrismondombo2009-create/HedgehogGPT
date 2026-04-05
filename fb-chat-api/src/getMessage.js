@@ -6,7 +6,7 @@
  */
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 function formatMessage(threadID, data) {
   switch (data.__typename) {
@@ -149,7 +149,8 @@ function formatMessage(threadID, data) {
         })),
         attachments:
           data.blob_attachments && data.blob_attachments.length > 0
-            ? data.blob_attachments.length.map((att) => {
+            ? data.blob_attachments.map((att) => {
+                // Fixed: was incorrectly written as .length.map() — .length is a Number
                 let x;
                 try {
                   x = utils._formatAttachment(att);
@@ -294,7 +295,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         }
       })
       .catch((err) => {
-        log.error("getMessage", err);
+        utils.error("getMessage", err);
         callback(err);
       });
 

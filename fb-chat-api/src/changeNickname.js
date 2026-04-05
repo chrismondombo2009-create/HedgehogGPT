@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function changeNickname(nickname, threadID, participantID, callback) {
@@ -50,7 +50,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         return callback();
       })
       .catch(function (err) {
-        log.error("changeNickname", err);
+        utils.error("changeNickname", err);
         return callback(err);
       });
 

@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function logout(callback) {
@@ -62,11 +62,11 @@ module.exports = function (defaultFuncs, api, ctx) {
       })
       .then(function () {
         ctx.loggedIn = false;
-        log.info("logout", "Logged out successfully.");
+        utils.log("logout", "Logged out successfully.");
         callback();
       })
       .catch(function (err) {
-        log.error("logout", err);
+        utils.error("logout", err);
         return callback(err);
       });
 

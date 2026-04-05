@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function httpPostFormData(url, form, customHeader, callback, notAPI) {
@@ -50,7 +50,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           callback(null, resData.body.toString());
         })
         .catch(function (err) {
-          log.error("httpPostFormData", err);
+          utils.error("httpPostFormData", err);
           return callback(err);
         });
     } else {
@@ -60,7 +60,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           callback(null, resData.body.toString());
         })
         .catch(function (err) {
-          log.error("httpPostFormData", err);
+          utils.error("httpPostFormData", err);
           return callback(err);
         });
     }

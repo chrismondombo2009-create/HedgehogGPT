@@ -1,7 +1,7 @@
 "use strict";
 
 const utils = require("../utils");
-const log = require("npmlog");
+// @NethWs3Dev
 
 module.exports = function (defaultFuncs, api, ctx) {
   return function deleteMessage(messageOrMessages, callback) {
@@ -47,7 +47,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         return callback();
       })
       .catch(function (err) {
-        log.error("deleteMessage", err);
+        utils.error("deleteMessage", err);
         return callback(err);
       });
 
