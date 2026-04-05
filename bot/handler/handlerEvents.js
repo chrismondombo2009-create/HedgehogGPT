@@ -149,40 +149,39 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
 const { body, messageID, threadID, isGroup } = event;
 
-// fix of the mentions
-if (body && body.includes('@') && isGroup) {
-  if (!event.mentions || Object.keys(event.mentions).length === 0) {
-    try {
-      const threadInfo = await api.getThreadInfo(threadID);
-      const allUsers = await api.getUserInfo(threadInfo.participantIDs);
-      
-      const atIndex = body.indexOf('@');
-      if (atIndex !== -1) {
-        const afterAt = body.substring(atIndex + 1).trim();
-        let bestMatch = null;
-        let bestMatchLength = 0;
-        for (const [id, info] of Object.entries(allUsers)) {
-          if (info.name) {
-            const lowerName = info.name.toLowerCase();
-            if (afterAt.toLowerCase().includes(lowerName) || lowerName.startsWith(afterAt.toLowerCase())) {
-              if (info.name.length > bestMatchLength) {
-                bestMatch = { id, name: info.name };
-                bestMatchLength = info.name.length;
-              }
-            }
-          }
+// ── Mention normalisation ─────────────────────────────────────────────────
+// The FCA library already runs parseMentions() (prng / tags_metadata /
+// profile_xmd) before this handler is called, so event.mentions should
+// always be a plain object { uid: "@Tag", ... } at this point.
+//
+// We only need to handle two edge-cases here — no API calls required:
+//
+//   1. event.mentions is missing entirely  → default to {}
+//   2. event.mentions is an array          → some older lib forks return
+//      [{id, offset, length}]; normalise to the object format so all
+//      commands that use Object.keys(event.mentions) keep working.
+//
+// What we do NOT do here (and why):
+//   ✗ getThreadInfo + getUserInfo  — 2 extra API calls per message, slow
+//   ✗ fuzzy name matching on body  — wrong uid if two users share a name
+//   ✗ single-mention only          — would silently drop the rest
+if (!event.mentions) {
+    event.mentions = {};
+} else if (Array.isArray(event.mentions)) {
+    // Normalise array format → { uid: tagText }
+    const body_ = event.body || "";
+    const normalised = {};
+    for (const m of event.mentions) {
+        if (m && m.id != null) {
+            const tag = (m.offset != null && m.length != null)
+                ? body_.substring(m.offset, m.offset + m.length)
+                : (m.name || m.tag || "");
+            normalised[String(m.id)] = tag;
         }
-        if (bestMatch) {
-          event.mentions = event.mentions || {};
-          event.mentions[bestMatch.id] = bestMatch.name;
-        }
-      }
-    } catch (error) {
     }
-  }
+    event.mentions = normalised;
 }
-event.mentions = event.mentions || {};
-// end of fix
+// ── End mention normalisation ─────────────────────────────────────────────
 // Check if has threadID
 if (!threadID)
         return;
