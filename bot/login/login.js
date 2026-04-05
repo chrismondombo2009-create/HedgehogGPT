@@ -715,6 +715,17 @@ async function startBot(loginWithEmail) {
 
 			global.GoatBot.fcaApi = api;
 			global.GoatBot.botID = api.getCurrentUserID();
+
+			// Wire api.ws3 so listenMqtt can trigger a relogin on MQTT error
+			// without a circular dependency back into login.js
+			api.ws3 = {
+				relogin: function() {
+					if (typeof global.GoatBot.reLoginBot === "function") {
+						global.GoatBot.reLoginBot();
+					}
+				}
+			};
+
 			log.info("LOGIN FACEBOOK", getText('login', 'loginSuccess'));
 			let hasBanned = false;
 			global.botID = api.getCurrentUserID();
