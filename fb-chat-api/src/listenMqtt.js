@@ -48,7 +48,7 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
   //Don't really know what this does but I think it's for the active state?
   //TODO: Move to ctx when implemented
   var chatOn = ctx.globalOptions.online;
-  var foreground = false;
+  var foreground = ctx.globalOptions.online;
   const sessionID = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1;
   const GUID = utils.getGUID()
   const username = {
@@ -66,7 +66,7 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
     st: [],
     pm: [],
     dc: '',
-    no_auto_fg: true,
+    no_auto_fg: false,
     gas: null,
     pack: [],
     a: ctx.globalOptions.userAgent,
