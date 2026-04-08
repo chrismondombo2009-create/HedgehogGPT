@@ -192,19 +192,19 @@ module.exports = async function (databaseType, threadModel, api, fakeGraphql) {
 					});
 				}
 				threadInfo = threadInfo || await api.getThreadInfo(threadID);
-				const { threadName, userInfo, adminIDs } = threadInfo;
-				const newAdminsIDs = adminIDs.reduce(function (_, b) {
+				const { threadName, userInfo = [], adminIDs = [] } = threadInfo;
+				const newAdminsIDs = (adminIDs || []).reduce(function (_, b) {
 					_.push(b.id);
 					return _;
 				}, []);
 
-				const newMembers = userInfo.reduce(function (arr, user) {
+				const newMembers = (userInfo || []).reduce(function (arr, user) {
 					const userID = user.id;
 					arr.push({
 						userID,
 						name: user.name,
 						gender: user.gender,
-						nickname: threadInfo.nicknames[userID] || null,
+						nickname: threadInfo.nicknames ? threadInfo.nicknames[userID] : null,
 						inGroup: true,
 						count: 0,
 						permissionConfigDashboard: false
