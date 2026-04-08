@@ -285,6 +285,17 @@ function parseMentionsFromDelta(data, body) {
 }
 
 function parseDelta(defaultFuncs, api, ctx, globalCallback, v) {
+  // TEMPORARY DEBUG LOG - remove after diagnosing private message issue
+  if (v.delta.class === "NewMessage" && v.delta.messageMetadata) {
+    const md = v.delta.messageMetadata;
+    const isGroup = !!md.threadKey.threadFbId;
+    utils.log("DEBUG_DELTA",
+      isGroup ? "GROUP" : "PRIVATE",
+      "senderID:", md.actorFbId,
+      "threadID:", md.threadKey.threadFbId || md.threadKey.otherUserFbId,
+      "body:", (v.delta.body || "").substring(0, 30)
+    );
+  }
   if (v.delta.class == "NewMessage") {
     //Not tested for pages
     if (ctx.globalOptions.pageID && ctx.globalOptions.pageID != v.queue) return;
