@@ -48,7 +48,7 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
   //Don't really know what this does but I think it's for the active state?
   //TODO: Move to ctx when implemented
   var chatOn = ctx.globalOptions.online;
-  var foreground = ctx.globalOptions.online;
+  var foreground = false;
   const sessionID = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1;
   const GUID = utils.getGUID()
   const username = {
@@ -66,7 +66,7 @@ function listenMqtt(defaultFuncs, api, ctx, globalCallback) {
     st: [],
     pm: [],
     dc: '',
-    no_auto_fg: false,
+    no_auto_fg: true,
     gas: null,
     pack: [],
     a: ctx.globalOptions.userAgent,
@@ -288,8 +288,12 @@ function parseDelta(defaultFuncs, api, ctx, globalCallback, v) {
   if (v.delta.class == "NewMessage") {
     //Not tested for pages
     if (ctx.globalOptions.pageID && ctx.globalOptions.pageID != v.queue) return;
+    // Normalize attachments: undefined/null → empty array
+    // Without this, private messages (which have no attachments field) cause
+    // infinite recursion → silent stack overflow → message never delivered.
+    const attachments = v.delta.attachments || [];
     (function resolveAttachmentUrl(i) {
-      if (v.delta.attachments && (i == v.delta.attachments.length)) {
+      if (i == attachments.length) {
         var fmtMsg;
         try {
           fmtMsg = utils.formatDeltaMessage(v);
@@ -306,9 +310,9 @@ function parseDelta(defaultFuncs, api, ctx, globalCallback, v) {
 
         return !ctx.globalOptions.selfListen && fmtMsg.senderID === ctx.userID ? undefined : (function() { globalCallback(null, fmtMsg); })();
       } else {
-        if (v.delta.attachments && (v.delta.attachments[i].mercury.attach_type == "photo")) {
-          api.resolvePhotoUrl(v.delta.attachments[i].fbid, (err, url) => {
-            if (!err) v.delta.attachments[i].mercury.metadata.url = url;
+        if (attachments[i].mercury && attachments[i].mercury.attach_type == "photo") {
+          api.resolvePhotoUrl(attachments[i].fbid, (err, url) => {
+            if (!err) attachments[i].mercury.metadata.url = url;
             return resolveAttachmentUrl(i + 1);
           });
         } else return resolveAttachmentUrl(i + 1);
