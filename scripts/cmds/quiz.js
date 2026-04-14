@@ -1,8 +1,6 @@
 const axios = require('axios');
 const { createCanvas } = require('canvas');
 
-if (!process.env.QUIZ_API_BASE_URL) throw new Error('[Quiz] QUIZ_API_BASE_URL is not defined');
-
 const API_BASE = "https://quiz-bot-octavio-fadil.vercel.app";
 const API_HEADERS = { 'x-api-key': 'fd-uchiha-octavio-quiz' };
 const API_TIMEOUT = { question: 22000, default: 8000 };
