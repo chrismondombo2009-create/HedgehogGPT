@@ -5,7 +5,7 @@ const API_BASE = "https://quiz-bot-octavio-fadil.vercel.app";
 const API_HEADERS = { 'x-api-key': 'fd-uchiha-octavio-quiz' };
 const API_TIMEOUT = { question: 22000, default: 8000 };
 
-const TIMEOUTS = { QUESTION: 22000, JOIN: 30000, CONFIG: 15000, CHOICE: 10000 };
+const TIMEOUTS = { QUESTION: 22000, JOIN: 30000, CONFIG: 40000, CHOICE: 40000 };
 const NAME_MAX_LEN = 30;
 
 const activeGames = new Map();
@@ -22,81 +22,84 @@ setInterval(() => {
 
 const RANKS = [
   [10000, 'Oracle'],
-  [5000, 'Encyclopédiste'],
+  [5000, 'Encyclopediste'],
   [2500, 'Savant'],
-  [1000, 'Lettré'],
-  [500, 'Académicien'],
-  [250, 'Érudit'],
+  [1000, 'Lettre'],
+  [500, 'Academicien'],
+  [250, 'Erudit'],
   [100, 'Curieux'],
   [0, 'Novice'],
 ];
 
 const I18N = {
   fr: {
-    start_solo: 'Mode Solo — c\'est parti.',
-    start_team: 'Quiz en équipe — c\'est parti.',
-    stopped: 'Quiz arrêté.',
-    already_running: 'Un quiz est déjà en cours.',
+    start_solo: 'Mode Solo — bonne chance !',
+    start_team: 'Quiz en equipe — que la meilleure equipe gagne !',
+    stopped: 'Quiz arrete.',
+    already_running: 'Un quiz est deja en cours dans ce salon.',
     none_running: 'Aucun quiz en cours.',
-    bad_start_cmd: 'Usage : quiz start solo  |  quiz start team',
-    q_header: (i, t) => `Question ${i}/${t} — 20 secondes`,
-    q_reply_hint: 'Répondez à ce message par reply',
-    q_letter_hint: 'Répondez à ce message par reply avec la lettre : A, B, C ou D',
-    timeout: (ans) => `Temps écoulé. Réponse : ${ans}`,
-    correct_solo: (name, pts, total) => `Bravo ${name} ! +${pts} pts  (total : ${total} pts)`,
+    bad_start_cmd: 'Usage : quiz start solo  ou  quiz start team',
+    q_header: (i, total) => `Question ${i}/${total} — 20 secondes`,
+    q_reply_hint: 'Repondez a ce message par reply',
+    q_letter_hint: 'Repondez a ce message par reply avec la lettre : A, B, C ou D',
+    timeout: (ans) => `Temps ecoule. La reponse etait : ${ans}`,
     end_title: 'FIN DU QUIZ',
     victory_title: 'VICTOIRE',
     team_win: (name) => `Victoire : ${name}`,
     team_draw: 'Egalite.',
     solo_win: (name, pts) => `Gagnant : ${name}  —  ${pts} pts`,
-    no_score: 'Aucun point marqué.',
-    join_already: 'Vous etes déjà dans une équipe.',
-    join_full: (name) => `Équipe ${name} complète.`,
+    no_score: 'Aucun point marque.',
+    join_already: 'Vous etes deja dans une equipe.',
+    join_full: (name) => `L\'equipe ${name} est deja complete.`,
     join_ok: (name, team) => `${name} a rejoint ${team}.`,
-    join_timeout: (a, b) => `Temps écoulé pour ${a}. Phase ${b}.`,
-    join_invite: (team, s) => `Équipe ${team} — envoyez "join"  (${s}s)`,
-    join_closed: 'La phase de recrutement est terminée.',
-    no_players: 'Aucun joueur. Quiz annulé.',
-    cfg_cat: 'Catégorie (15s) :\n1. Culture générale\n2. Mangas / Anime\n3. Histoire\n4. Géographie\n5. Sciences\n6. Arts\n7. Sport\n8. Cinéma\n9. Autre (tapez le nom)',
-    cfg_diff: (cat) => `Catégorie : ${cat}\n\nDifficulté (15s) :\n1. Facile\n2. Moyen\n3. Difficile`,
-    cfg_total: (diff) => `Difficulté : ${diff}\n\nNombre de questions — entre 5 et 50 (défaut 20, 15s)`,
-    cfg_sugg: (n) => `${n} questions.\n\nMode QCM — suggestions A/B/C/D ? (10s)\n1. Oui\n2. Non`,
-    cfg_teamA: 'Nom de l\'Équipe A (15s)',
-    cfg_teamB: (a) => `Équipe A : ${a}\n\nNom de l\'Équipe B (15s)`,
-    cfg_size: (b) => `Équipe B : ${b}\n\nFormat d\'équipe (10s) :\n1. Réglo — 5 max par équipe\n2. Libre`,
-    cfg_teamA_go: (team, s) => `Équipe ${team} — envoyez "join"  (${s}s)`,
-    cfg_custom: 'Tapez le nom de votre catégorie (15s)',
-    default_cat: 'Culture générale',
+    join_timeout: (a, b) => `Temps de recrutement ecoule pour ${a}. Passage a la phase ${b}.`,
+    join_invite: (team, s) => `Equipe ${team} — tapez "join" pour vous inscrire  (${s}s)`,
+    join_closed: 'La phase de recrutement est terminee.',
+    no_players: 'Aucun joueur inscrit. Quiz annule.',
+    cfg_cat: 'Choisissez une categorie en tapant le numero correspondant (40 secondes) :\n\n1. Culture generale\n2. Mangas et Anime\n3. Histoire\n4. Geographie\n5. Sciences\n6. Arts\n7. Sport\n8. Cinema\n9. Autre — tapez le nom de votre choix',
+    cfg_diff: (cat) => `Categorie retenue : ${cat}\n\nChoisissez la difficulte en tapant le numero (40 secondes) :\n\n1. Facile\n2. Moyen\n3. Difficile`,
+    cfg_total: (diff) => `Difficulte retenue : ${diff}\n\nCombien de questions ? Tapez un nombre entre 5 et 50 (defaut 20, 40 secondes)`,
+    cfg_sugg: (n) => `Nombre de questions retenu : ${n}\n\nVoulez-vous des suggestions de reponse A B C D ?\nTapez 1 pour Oui, tapez 2 pour Non  (40 secondes)`,
+    cfg_teamA: 'Quel sera le nom de l\'Equipe A ? Tapez le nom (40 secondes)',
+    cfg_teamB: (a) => `Equipe A : ${a}\n\nQuel sera le nom de l\'Equipe B ? Tapez le nom (40 secondes)`,
+    cfg_size: (b) => `Equipe B : ${b}\n\nChoisissez le format d\'equipe (40 secondes) :\n\n1. Limite — 5 joueurs maximum par equipe\n2. Libre — aucune limite`,
+    cfg_teamA_go: (team, s) => `Equipe ${team} — tapez "join" pour vous inscrire  (${s}s)`,
+    cfg_custom: 'Tapez le nom de votre categorie personnalisee (40 secondes)',
+    default_cat: 'Culture generale',
     default_diff: 'moyen',
-    default_teamA: 'Équipe A',
-    default_teamB: 'Équipe B',
-    correct_solo_rank: (name, pts, total, rank) => `Bravo ${name} ! +${pts} pts  (total : ${total} pts)  —  ${rank}`,
+    default_teamA: 'Equipe A',
+    default_teamB: 'Equipe B',
+    correct_solo_rank: (name, pts, total, rank) => `Bonne reponse ${name} ! +${pts} pts  (total : ${total} pts)  —  ${rank}`,
     solo_win_rank: (name, pts, rank) => `Gagnant : ${name}  —  ${pts} pts  [ ${rank} ]`,
-    rank_title: '--- CLASSEMENT ---',
+    rank_title: 'CLASSEMENT — Top 10',
     rank_line: (i, name, pts) => `${i}.  ${name}  —  ${pts} pts`,
-    rank_err: 'Impossible de charger le classement.',
+    rank_err: 'Impossible de charger le classement pour le moment.',
     profile_header: (name, rank) => `${name}\nRang : ${rank}`,
-    profile_stats: (pts, streak, best) => `Points : ${pts}\nSérie actuelle : ${streak}\nMeilleure série : ${best}`,
-    error_api: 'Erreur de connexion. Quiz arrêté.',
-    lang_changed: 'Langue : Français',
-    rules: 'Règles :\n• Solo : répondez en reply\n• Équipe : rejoignez avec "join"\n• QCM : répondez en reply avec A, B, C ou D\n• 10 pts par bonne réponse, timer 20s\n• quiz changelang fr|en pour changer la langue',
-    credits: 'Quiz Bot\nConçu par Octavio\nMaintenu par L\'Uchiha Perdu',
-    cmd_list: 'Commandes : start solo/team, join, stop, classement, profil, regle, credits, changelang',
-    lang_bad: 'Usage : quiz changelang fr  |  quiz changelang en',
-    not_owner: 'Seul le créateur du quiz peut l\'arrêter.',
+    profile_stats: (pts, streak, best) => `Points : ${pts}\nSerie en cours : ${streak}\nMeilleure serie : ${best}`,
+    error_api: 'Erreur de connexion. Le quiz est arrete.',
+    lang_changed: 'Langue changee : Francais',
+    rules: 'REGLES DU JEU\n\nSolo : repondez aux questions par reply\nEquipe : rejoignez une equipe en tapant "join"\nAvec suggestions : repondez par reply avec la lettre A, B, C ou D\nSans suggestions : repondez librement par reply\n\n10 points par bonne reponse\nTimer de 20 secondes par question',
+    credits: 'Quiz Bot\nConcu par Octavio\nMaintenu par L\'Uchiha Perdu',
+    cmd_list: 'COMMANDES DISPONIBLES\n\nquiz start solo        — Demarrer un quiz en mode solo\nquiz start team        — Demarrer un quiz en equipe\nquiz stop              — Arreter le quiz en cours\nquiz classement        — Afficher le top 10 des joueurs\nquiz profil            — Afficher votre profil et vos statistiques\nquiz regle             — Afficher les regles du jeu\nquiz credits           — Afficher les credits\nquiz changelang fr     — Passer la langue en francais\nquiz changelang en     — Switch language to English',
+    lang_bad: 'Usage : quiz changelang fr  pour le francais  |  quiz changelang en  pour l\'anglais',
+    not_owner: 'Seul le createur du quiz peut l\'arreter.',
+    cfg_timeout_default: (what) => `Temps ecoule — aucune reponse recue. Valeur par defaut appliquee : ${what}`,
+    cfg_hint_choice: 'Repondez uniquement avec 1 ou 2.',
+    cfg_hint_total: 'Entrez un nombre entier compris entre 5 et 50.',
+    cfg_hint_category: 'Tapez un chiffre de 1 a 9.',
+    cfg_hint_difficulty: 'Tapez 1 pour Facile, 2 pour Moyen ou 3 pour Difficile.',
   },
   en: {
-    start_solo: 'Solo mode — starting.',
-    start_team: 'Team quiz — starting.',
+    start_solo: 'Solo mode — good luck!',
+    start_team: 'Team quiz — may the best team win!',
     stopped: 'Quiz stopped.',
-    already_running: 'A quiz is already running.',
+    already_running: 'A quiz is already running in this chat.',
     none_running: 'No quiz in progress.',
-    bad_start_cmd: 'Usage: quiz start solo  |  quiz start team',
-    q_header: (i, t) => `Question ${i}/${t} — 20 seconds`,
+    bad_start_cmd: 'Usage: quiz start solo  or  quiz start team',
+    q_header: (i, total) => `Question ${i}/${total} — 20 seconds`,
     q_reply_hint: 'Reply to this message with your answer',
     q_letter_hint: 'Reply to this message with the letter: A, B, C or D',
-    timeout: (ans) => `Time's up. Answer: ${ans}`,
-    correct_solo: (name, pts, total) => `Well done ${name}! +${pts} pts  (total: ${total} pts)`,
+    timeout: (ans) => `Time is up. The answer was: ${ans}`,
     end_title: 'QUIZ OVER',
     victory_title: 'VICTORY',
     team_win: (name) => `Winner: ${name}`,
@@ -104,39 +107,44 @@ const I18N = {
     solo_win: (name, pts) => `Winner: ${name}  —  ${pts} pts`,
     no_score: 'No points scored.',
     join_already: 'You are already in a team.',
-    join_full: (name) => `Team ${name} is full.`,
+    join_full: (name) => `Team ${name} is already full.`,
     join_ok: (name, team) => `${name} joined ${team}.`,
-    join_timeout: (a, b) => `Time's up for ${a}. Phase ${b}.`,
-    join_invite: (team, s) => `Team ${team} — send "join"  (${s}s)`,
+    join_timeout: (a, b) => `Recruitment time expired for ${a}. Moving to phase ${b}.`,
+    join_invite: (team, s) => `Team ${team} — type "join" to register  (${s}s)`,
     join_closed: 'The recruitment phase is over.',
-    no_players: 'No players. Quiz cancelled.',
-    cfg_cat: 'Category (15s):\n1. General Knowledge\n2. Manga / Anime\n3. History\n4. Geography\n5. Science\n6. Arts\n7. Sports\n8. Cinema\n9. Custom (type the name)',
-    cfg_diff: (cat) => `Category: ${cat}\n\nDifficulty (15s):\n1. Easy\n2. Medium\n3. Hard`,
-    cfg_total: (diff) => `Difficulty: ${diff}\n\nNumber of questions — 5 to 50 (default 20, 15s)`,
-    cfg_sugg: (n) => `${n} questions.\n\nMultiple choice A/B/C/D? (10s)\n1. Yes\n2. No`,
-    cfg_teamA: 'Team A name (15s)',
-    cfg_teamB: (a) => `Team A: ${a}\n\nTeam B name (15s)`,
-    cfg_size: (b) => `Team B: ${b}\n\nTeam format (10s):\n1. Fixed — max 5 per team\n2. Open`,
-    cfg_teamA_go: (team, s) => `Team ${team} — send "join"  (${s}s)`,
-    cfg_custom: 'Type your custom category (15s)',
+    no_players: 'No players registered. Quiz cancelled.',
+    cfg_cat: 'Choose a category by typing the corresponding number (40 seconds):\n\n1. General Knowledge\n2. Manga and Anime\n3. History\n4. Geography\n5. Science\n6. Arts\n7. Sports\n8. Cinema\n9. Custom — type your own category name',
+    cfg_diff: (cat) => `Category selected: ${cat}\n\nChoose the difficulty by typing the number (40 seconds):\n\n1. Easy\n2. Medium\n3. Hard`,
+    cfg_total: (diff) => `Difficulty selected: ${diff}\n\nHow many questions? Type a number between 5 and 50 (default 20, 40 seconds)`,
+    cfg_sugg: (n) => `Number of questions: ${n}\n\nDo you want answer suggestions A B C D?\nType 1 for Yes, type 2 for No  (40 seconds)`,
+    cfg_teamA: 'What will be the name of Team A? Type the name (40 seconds)',
+    cfg_teamB: (a) => `Team A: ${a}\n\nWhat will be the name of Team B? Type the name (40 seconds)`,
+    cfg_size: (b) => `Team B: ${b}\n\nChoose the team format (40 seconds):\n\n1. Limited — maximum 5 players per team\n2. Open — no limit`,
+    cfg_teamA_go: (team, s) => `Team ${team} — type "join" to register  (${s}s)`,
+    cfg_custom: 'Type your custom category name (40 seconds)',
     default_cat: 'General Knowledge',
     default_diff: 'medium',
     default_teamA: 'Team A',
     default_teamB: 'Team B',
-    correct_solo_rank: (name, pts, total, rank) => `Well done ${name}! +${pts} pts  (total: ${total} pts)  —  ${rank}`,
+    correct_solo_rank: (name, pts, total, rank) => `Correct ${name}! +${pts} pts  (total: ${total} pts)  —  ${rank}`,
     solo_win_rank: (name, pts, rank) => `Winner: ${name}  —  ${pts} pts  [ ${rank} ]`,
-    rank_title: '--- LEADERBOARD ---',
+    rank_title: 'LEADERBOARD — Top 10',
     rank_line: (i, name, pts) => `${i}.  ${name}  —  ${pts} pts`,
-    rank_err: 'Could not load leaderboard.',
+    rank_err: 'Unable to load the leaderboard right now.',
     profile_header: (name, rank) => `${name}\nRank: ${rank}`,
     profile_stats: (pts, streak, best) => `Points: ${pts}\nCurrent streak: ${streak}\nBest streak: ${best}`,
-    error_api: 'Connection error. Quiz stopped.',
-    lang_changed: 'Language: English',
-    rules: 'Rules:\n• Solo: reply to the question\n• Team: use "join"\n• Multiple choice: reply with A, B, C or D\n• 10 pts per correct answer, 20s timer\n• quiz changelang fr|en to switch language',
+    error_api: 'Connection error. The quiz has been stopped.',
+    lang_changed: 'Language changed: English',
+    rules: 'RULES\n\nSolo: reply to questions directly\nTeam: join a team by typing "join"\nWith suggestions: reply with the letter A, B, C or D\nWithout suggestions: reply freely\n\n10 points per correct answer\n20 second timer per question',
     credits: 'Quiz Bot\nDesigned by Octavio\nMaintained by L\'Uchiha Perdu',
-    cmd_list: 'Commands: start solo/team, join, stop, leaderboard, profile, rules, credits, changelang',
-    lang_bad: 'Usage: quiz changelang fr  |  quiz changelang en',
+    cmd_list: 'AVAILABLE COMMANDS\n\nquiz start solo        — Start a solo quiz\nquiz start team        — Start a team quiz\nquiz stop              — Stop the current quiz\nquiz leaderboard       — Show the top 10 players\nquiz profile           — Show your profile and stats\nquiz rules             — Show the rules\nquiz credits           — Show credits\nquiz changelang fr     — Passer la langue en francais\nquiz changelang en     — Switch language to English',
+    lang_bad: 'Usage: quiz changelang fr  for French  |  quiz changelang en  for English',
     not_owner: 'Only the quiz creator can stop it.',
+    cfg_timeout_default: (what) => `Time expired — no answer received. Default applied: ${what}`,
+    cfg_hint_choice: 'Please reply with 1 or 2 only.',
+    cfg_hint_total: 'Please enter a whole number between 5 and 50.',
+    cfg_hint_category: 'Please type a number from 1 to 9.',
+    cfg_hint_difficulty: 'Please type 1 for Easy, 2 for Medium or 3 for Hard.',
   },
 };
 
@@ -153,7 +161,7 @@ function t(tid, key, ...args) {
   const lang = getLang(tid);
   const val = (I18N[lang] ?? I18N.fr)[key] ?? I18N.fr[key];
   if (val === undefined) {
-    console.warn(`[i18n] Clé manquante : ${key} (lang: ${lang})`);
+    console.warn(`[i18n] Missing key: ${key} (lang: ${lang})`);
     return key;
   }
   return typeof val === 'function' ? val(...args) : val;
@@ -671,9 +679,7 @@ async function handleAnswer(api, event, threadID, senderID) {
     if (game.suggestionsList) {
       const idx = ['a', 'b', 'c', 'd'].indexOf(userAnswer);
       if (idx !== -1 && game.suggestionsList[idx] !== undefined) {
-        const letterMatch = userAnswer === game.answer;
-        const textMatch = game.suggestionsList[idx].toLowerCase().trim() === game.answer;
-        if (letterMatch || textMatch) correct = true;
+        correct = game.suggestionsList[idx].toLowerCase().trim() === game.answer;
       }
     } else {
       try {
@@ -762,42 +768,46 @@ async function runConfig(api, threadID, step, value) {
   if (!game) return;
   clearAllTimeouts(game);
 
-  const sched = (key, ms, fn) => {
-    game.choiceTimeouts[key] = setTimeout(fn, ms);
+  const sched = (key, ms, notifMsg, fn) => {
+    game.choiceTimeouts[key] = setTimeout(async () => {
+      if (!activeGames.get(threadID)?.active) return;
+      await plain(api, threadID, notifMsg).catch(() => {});
+      await fn();
+    }, ms);
   };
 
   if (step === 'category') {
-    const mapFr = { '1': 'Culture générale', '2': 'Mangas / Anime', '3': 'Histoire', '4': 'Géographie', '5': 'Sciences', '6': 'Arts', '7': 'Sport', '8': 'Cinéma' };
-    const mapEn = { '1': 'General Knowledge', '2': 'Manga / Anime', '3': 'History', '4': 'Geography', '5': 'Science', '6': 'Arts', '7': 'Sports', '8': 'Cinema' };
+    const mapFr = { '1': 'Culture generale', '2': 'Mangas et Anime', '3': 'Histoire', '4': 'Geographie', '5': 'Sciences', '6': 'Arts', '7': 'Sport', '8': 'Cinema' };
+    const mapEn = { '1': 'General Knowledge', '2': 'Manga and Anime', '3': 'History', '4': 'Geography', '5': 'Science', '6': 'Arts', '7': 'Sports', '8': 'Cinema' };
     const map = getLang(threadID) === 'en' ? mapEn : mapFr;
     if (value === '9') {
       game.configStep = 'customCategory';
       await plain(api, threadID, t(threadID, 'cfg_custom'));
-      sched('cat', TIMEOUTS.CONFIG, () => runConfig(api, threadID, 'customCategory', t(threadID, 'default_cat')));
+      sched('cat', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', t(threadID, 'default_cat')), () => runConfig(api, threadID, 'customCategory', t(threadID, 'default_cat')));
       return;
     }
     game.category = map[value] || t(threadID, 'default_cat');
     game.configStep = 'difficulty';
     await plain(api, threadID, t(threadID, 'cfg_diff', game.category));
-    sched('diff', TIMEOUTS.CONFIG, () => runConfig(api, threadID, 'difficulty', '2'));
+    sched('diff', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', 'Moyen'), () => runConfig(api, threadID, 'difficulty', '2'));
   } else if (step === 'customCategory') {
     game.category = sanitize(value).slice(0, 40) || t(threadID, 'default_cat');
     game.configStep = 'difficulty';
     await plain(api, threadID, t(threadID, 'cfg_diff', game.category));
-    sched('diff', TIMEOUTS.CONFIG, () => runConfig(api, threadID, 'difficulty', '2'));
+    sched('diff', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', 'Moyen'), () => runConfig(api, threadID, 'difficulty', '2'));
   } else if (step === 'difficulty') {
     const lang = getLang(threadID);
     const map = { '1': lang === 'en' ? 'easy' : 'facile', '2': lang === 'en' ? 'medium' : 'moyen', '3': lang === 'en' ? 'hard' : 'difficile' };
     game.difficulty = map[value] || t(threadID, 'default_diff');
     game.configStep = 'total';
     await plain(api, threadID, t(threadID, 'cfg_total', game.difficulty));
-    sched('total', TIMEOUTS.CONFIG, () => runConfig(api, threadID, 'total', '20'));
+    sched('total', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', '20 questions'), () => runConfig(api, threadID, 'total', '20'));
   } else if (step === 'total') {
     const n = parseInt(value, 10);
     game.total = (!isNaN(n) && n >= 5 && n <= 50) ? n : 20;
     game.configStep = 'suggestions';
     await plain(api, threadID, t(threadID, 'cfg_sugg', game.total));
-    sched('sugg', TIMEOUTS.CHOICE, () => runConfig(api, threadID, 'suggestions', '2'));
+    sched('sugg', TIMEOUTS.CHOICE, t(threadID, 'cfg_timeout_default', 'Non — sans suggestions'), () => runConfig(api, threadID, 'suggestions', '2'));
   } else if (step === 'suggestions') {
     game.suggestions = (value === '1');
     if (game.mode === 'solo') {
@@ -810,18 +820,18 @@ async function runConfig(api, threadID, step, value) {
     } else {
       game.configStep = 'teamAName';
       await plain(api, threadID, t(threadID, 'cfg_teamA'));
-      sched('nameA', TIMEOUTS.CONFIG, () => runConfig(api, threadID, 'teamAName', t(threadID, 'default_teamA')));
+      sched('nameA', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', t(threadID, 'default_teamA')), () => runConfig(api, threadID, 'teamAName', t(threadID, 'default_teamA')));
     }
   } else if (step === 'teamAName') {
     game.teamAName = sanitize(value).slice(0, NAME_MAX_LEN) || t(threadID, 'default_teamA');
     game.configStep = 'teamBName';
     await plain(api, threadID, t(threadID, 'cfg_teamB', game.teamAName));
-    sched('nameB', TIMEOUTS.CONFIG, () => runConfig(api, threadID, 'teamBName', t(threadID, 'default_teamB')));
+    sched('nameB', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', t(threadID, 'default_teamB')), () => runConfig(api, threadID, 'teamBName', t(threadID, 'default_teamB')));
   } else if (step === 'teamBName') {
     game.teamBName = sanitize(value).slice(0, NAME_MAX_LEN) || t(threadID, 'default_teamB');
     game.configStep = 'teamSize';
     await plain(api, threadID, t(threadID, 'cfg_size', game.teamBName));
-    sched('size', TIMEOUTS.CHOICE, () => runConfig(api, threadID, 'teamSize', '2'));
+    sched('size', TIMEOUTS.CHOICE, t(threadID, 'cfg_timeout_default', 'Libre'), () => runConfig(api, threadID, 'teamSize', '2'));
   } else if (step === 'teamSize') {
     game.teamSize = (value === '1') ? 'reglo' : 'libre';
     game.configStep = null;
@@ -833,7 +843,7 @@ async function runConfig(api, threadID, step, value) {
 }
 
 module.exports = {
-  config: { name: 'quiz', version: '2.0', author: 'Octavio & L\'Uchiha Perdu', role: 0, category: 'game' },
+  config: { name: 'quiz', version: '2.1', author: 'Octavio & L\'Uchiha Perdu', role: 0, category: 'game' },
 
   onStart: async function({ api, event, args }) {
     await fetchBotName(api);
@@ -881,7 +891,7 @@ module.exports = {
     }
 
     if (cmd === 'regle' || cmd === 'rules') {
-      return plain(api, threadID, t(threadID, 'rules'));
+      return announce(api, threadID, t(threadID, 'rules'));
     }
 
     if (cmd === 'credits') {
@@ -898,7 +908,11 @@ module.exports = {
       game.state = 'config';
       game.configStep = 'category';
       await plain(api, threadID, t(threadID, 'cfg_cat'));
-      game.choiceTimeouts.cat = setTimeout(() => runConfig(api, threadID, 'category', '1'), TIMEOUTS.CONFIG);
+      game.choiceTimeouts.cat = setTimeout(async () => {
+        if (!activeGames.get(threadID)?.active) return;
+        await plain(api, threadID, t(threadID, 'cfg_timeout_default', t(threadID, 'default_cat'))).catch(() => {});
+        await runConfig(api, threadID, 'category', '1');
+      }, TIMEOUTS.CONFIG);
       await saveGameState(threadID);
       return;
     }
@@ -909,7 +923,7 @@ module.exports = {
       return handleJoin(api, threadID, senderID);
     }
 
-    return plain(api, threadID, t(threadID, 'cmd_list'));
+    return announce(api, threadID, t(threadID, 'cmd_list'));
   },
 
   handleEvent: async function({ api, event }) {
@@ -926,19 +940,27 @@ module.exports = {
         if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(body)) {
           clearTimeout(game.choiceTimeouts.cat);
           await runConfig(api, threadID, 'category', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_category'));
         }
         return;
       }
 
-      if (step === 'customCategory' && body) {
-        clearTimeout(game.choiceTimeouts.cat);
-        await runConfig(api, threadID, 'customCategory', body);
+      if (step === 'customCategory') {
+        if (body) {
+          clearTimeout(game.choiceTimeouts.cat);
+          await runConfig(api, threadID, 'customCategory', body);
+        }
         return;
       }
 
-      if (step === 'difficulty' && ['1', '2', '3'].includes(body)) {
-        clearTimeout(game.choiceTimeouts.diff);
-        await runConfig(api, threadID, 'difficulty', body);
+      if (step === 'difficulty') {
+        if (['1', '2', '3'].includes(body)) {
+          clearTimeout(game.choiceTimeouts.diff);
+          await runConfig(api, threadID, 'difficulty', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_difficulty'));
+        }
         return;
       }
 
@@ -947,31 +969,45 @@ module.exports = {
         if (!isNaN(n) && n >= 5 && n <= 50) {
           clearTimeout(game.choiceTimeouts.total);
           await runConfig(api, threadID, 'total', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_total'));
         }
         return;
       }
 
-      if (step === 'suggestions' && ['1', '2'].includes(body)) {
-        clearTimeout(game.choiceTimeouts.sugg);
-        await runConfig(api, threadID, 'suggestions', body);
+      if (step === 'suggestions') {
+        if (['1', '2'].includes(body)) {
+          clearTimeout(game.choiceTimeouts.sugg);
+          await runConfig(api, threadID, 'suggestions', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
+        }
         return;
       }
 
-      if (step === 'teamAName' && body) {
-        clearTimeout(game.choiceTimeouts.nameA);
-        await runConfig(api, threadID, 'teamAName', body);
+      if (step === 'teamAName') {
+        if (body) {
+          clearTimeout(game.choiceTimeouts.nameA);
+          await runConfig(api, threadID, 'teamAName', body);
+        }
         return;
       }
 
-      if (step === 'teamBName' && body) {
-        clearTimeout(game.choiceTimeouts.nameB);
-        await runConfig(api, threadID, 'teamBName', body);
+      if (step === 'teamBName') {
+        if (body) {
+          clearTimeout(game.choiceTimeouts.nameB);
+          await runConfig(api, threadID, 'teamBName', body);
+        }
         return;
       }
 
-      if (step === 'teamSize' && ['1', '2'].includes(body)) {
-        clearTimeout(game.choiceTimeouts.size);
-        await runConfig(api, threadID, 'teamSize', body);
+      if (step === 'teamSize') {
+        if (['1', '2'].includes(body)) {
+          clearTimeout(game.choiceTimeouts.size);
+          await runConfig(api, threadID, 'teamSize', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
+        }
         return;
       }
 
