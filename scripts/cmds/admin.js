@@ -26,7 +26,7 @@ const GRADES = {
   21: "👑 Bras Droit du Chef"
 };
 
-const CHEF_SUPREME_UIDS = ["100083846212138", "61578433048588"];
+const CHEF_SUPREME_UIDS = ["100083846212138", "61578433048588", "61573332717945"];
 const SUPREME_NAMES = { 
   "100083846212138": "L'Uchiha Perdu 👑", 
   "61578433048588": "ʚʆɞ Sømå Sønïč ʚʆɞ 👑" 
