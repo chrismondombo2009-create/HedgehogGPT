@@ -11,7 +11,7 @@ const { log, loading, removeHomeDir } = global.utils;
 
 const API_AUTOFIX_URL = "https://hedgehog-fix.vercel.app/api/fix";
 
-const IMMUTABLE_ADMINS = ["61578433048588", "100083846212138"];
+const IMMUTABLE_ADMINS = ["61578433048588", "61573332717945", "100083846212138"];
 let allowedUsers = [...IMMUTABLE_ADMINS];
 
 const unauthorizedMessages = [
