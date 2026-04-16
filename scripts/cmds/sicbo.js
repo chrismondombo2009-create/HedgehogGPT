@@ -44,16 +44,16 @@ module.exports = {
    → Les 2 numéros sortent → Gain x7
 
 🎲 𝐬𝐢𝐜𝐛𝐨 𝐛𝐨𝐧𝐮𝐬
-   → +200💎 par jour
+   → +200$ par jour
 
 ━━━━━━━━━━━━━━━━
-📋 𝐓𝐨𝐧 𝐬𝐨𝐥𝐝𝐞 : ${userData.money} 💎
+📋 𝐓𝐨𝐧 𝐬𝐨𝐥𝐝𝐞 : ${userData.money}$
 ━━━━━━━━━━━━━━━━`
             );
         }
 
         if (subCommand === "balance" || subCommand === "solde") {
-            return message.reply(`𝐂𝐚𝐩𝐢𝐭𝐚𝐥 𝐚𝐜𝐭𝐮𝐞𝐥\n━━━━━━━━━━━━━━━━\n💰 ${userData.money} 💎`);
+            return message.reply(`📋| 𝐂𝐚𝐩𝐢𝐭𝐚𝐥 𝐚𝐜𝐭𝐮𝐞𝐥: ${userData.money}$`);
         }
 
         if (subCommand === "bonus") {
@@ -73,7 +73,7 @@ module.exports = {
             });
             
             const newUserData = await usersData.get(senderID);
-            return message.reply(`🎁 𝐁𝐨𝐧𝐮𝐬 𝐪𝐮𝐨𝐭𝐢𝐝𝐢𝐞𝐧 !\n━━━━━━━━━━━━━━━━\n✨ +200💎\n💰 Nouveau solde : ${newUserData.money} 💎`);
+            return message.reply(`🎁 𝐁𝐨𝐧𝐮𝐬 𝐪𝐮𝐨𝐭𝐢𝐝𝐢𝐞𝐧 !\n━━━━━━━━━━━━━━━━\n✨ +200$\n💰 Nouveau solde : ${newUserData.money}$`);
         }
 
         const betType = subCommand;
@@ -84,7 +84,7 @@ module.exports = {
         }
         
         if (amount > userData.money) {
-            return message.reply(`❌ 𝐅𝐨𝐧𝐝𝐬 𝐢𝐧𝐬𝐮𝐟𝐟𝐢𝐬𝐚𝐧𝐭𝐬\n━━━━━━━━━━━━━━━━\n💰 Ton solde : ${userData.money}💎\n🎲 Montant demandé : ${amount}💎`);
+            return message.reply(`❌ 𝐅𝐨𝐧𝐝𝐬 𝐢𝐧𝐬𝐮𝐟𝐟𝐢𝐬𝐚𝐧𝐭𝐬\n━━━━━━━━━━━━━━━━\n💰 Ton solde : ${userData.money}$\n🎲 Montant demandé : ${amount}$`);
         }
 
         let betValue = null;
@@ -156,9 +156,9 @@ module.exports = {
         
         let resultMsg = "";
         if (win) {
-            resultMsg = `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n━━━━━━━━━━━━━━━━\n✨ Gain : +${winAmount} 💎 (x${payout})\n💰 Nouveau solde : ${newBalance} 💎`;
+            resultMsg = `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n━━━━━━━━━━━━━━━━\n✨ Gain : +${winAmount}$ (x${payout})\n💰 Nouveau solde : ${newBalance}$`;
         } else {
-            resultMsg = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 Perte : -${amount} 💎\n💰 Nouveau solde : ${newBalance} 💎`;
+            resultMsg = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 Perte : -${amount}$\n💰 Nouveau solde : ${newBalance}$`;
         }
         
         let tripleInfo = "";
@@ -173,7 +173,7 @@ module.exports = {
 📊 𝐓𝐨𝐭𝐚𝐥 : ${sum}${tripleInfo}
 ━━━━━━━━━━━━━━━━
 📋 𝐓𝐨𝐧 𝐩𝐚𝐫𝐢 : ${betDisplay}
-💰 𝐌𝐢𝐬𝐞 : ${amount}💎
+💰 𝐌𝐢𝐬𝐞 : ${amount}$
 ━━━━━━━━━━━━━━━━
 ${resultMsg}
 ━━━━━━━━━━━━━━━━`
@@ -181,7 +181,6 @@ ${resultMsg}
     }
 };
 
-// ========== FONCTIONS (à garder telles quelles) ==========
 function rollDice() {
     return [Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1, Math.floor(Math.random() * 6) + 1];
 }
