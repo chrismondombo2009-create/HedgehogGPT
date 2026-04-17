@@ -83,7 +83,7 @@ const I18N = {
     cmd_list: 'COMMANDES DISPONIBLES\n\nquiz start solo        — Demarrer un quiz en mode solo\nquiz start team        — Demarrer un quiz en equipe\nquiz stop              — Arreter le quiz en cours\nquiz classement        — Afficher le top 10 des joueurs\nquiz profil            — Afficher votre profil\nquiz regle             — Afficher les regles du jeu\nquiz credits           — Afficher les credits\nquiz changelang fr     — Passer en francais\nquiz changelang en     — Switch to English',
     lang_bad: 'Usage : quiz changelang fr  pour le francais  |  quiz changelang en  pour l\'anglais',
     not_owner: 'Seul le createur du quiz peut l\'arreter.',
-    cfg_timeout_default: (what) => `Temps ecoule — aucune reponse. Valeur par defaut appliquee : ${what}`,
+    cfg_timeout_default: (what) => `Temps ecoule — aucune reponse. Valeur par defaut : ${what}`,
     cfg_hint_choice: 'Repondez uniquement avec 1 ou 2.',
     cfg_hint_total: 'Entrez un nombre entier entre 5 et 50.',
     cfg_hint_category: 'Tapez un chiffre de 1 a 9.',
@@ -139,7 +139,7 @@ const I18N = {
     cmd_list: 'AVAILABLE COMMANDS\n\nquiz start solo        — Start a solo quiz\nquiz start team        — Start a team quiz\nquiz stop              — Stop the current quiz\nquiz leaderboard       — Show the top 10 players\nquiz profile           — Show your profile\nquiz rules             — Show the rules\nquiz credits           — Show credits\nquiz changelang fr     — Passer en francais\nquiz changelang en     — Switch to English',
     lang_bad: 'Usage: quiz changelang fr  for French  |  quiz changelang en  for English',
     not_owner: 'Only the quiz creator can stop it.',
-    cfg_timeout_default: (what) => `Time expired — no answer. Default applied: ${what}`,
+    cfg_timeout_default: (what) => `Time expired — no answer. Default: ${what}`,
     cfg_hint_choice: 'Please reply with 1 or 2 only.',
     cfg_hint_total: 'Please enter a whole number between 5 and 50.',
     cfg_hint_category: 'Please type a number from 1 to 9.',
@@ -172,14 +172,6 @@ function getRank(pts) {
   return RANKS[RANKS.length - 1][1];
 }
 
-function regReply(messageID, data) {
-  try { global.GoatBot?.onReply?.set(messageID, { commandName: 'quiz', ...data }); } catch(e) {}
-}
-
-function unregReply(messageID) {
-  try { if (messageID) global.GoatBot?.onReply?.delete(messageID); } catch(e) {}
-}
-
 let botName = 'QuizBot';
 let botNameFetched = false;
 
@@ -191,7 +183,7 @@ async function fetchBotName(api) {
     if (!uid) return;
     const info = await api.getUserInfo(uid);
     if (info[uid]?.name) botName = info[uid].name;
-  } catch (err) {
+  } catch (e) {
     botNameFetched = false;
   }
 }
@@ -204,7 +196,7 @@ async function getUserName(api, id) {
     const name = sanitize(info[id]?.name || 'Joueur');
     nameCache.set(id, { name, ts: Date.now() });
     return name;
-  } catch (err) {
+  } catch (e) {
     return 'Inconnu';
   }
 }
@@ -230,11 +222,9 @@ function makeGame() {
     answer: null,
     suggestionsList: null,
     messageID: null,
-    configMsgID: null,
     timer: null,
     timerEnd: 0,
     index: 0,
-    state: 'idle',
     configStep: null,
     configLock: false,
     joinPhase: null,
@@ -273,12 +263,12 @@ async function saveGameState(threadID) {
         scores: g.scores, sessionCorrect: g.sessionCorrect,
         currentQuestion: g.currentQuestion, answer: g.answer,
         suggestionsList: g.suggestionsList, messageID: g.messageID,
-        timerEnd: g.timerEnd, index: g.index, state: g.state, ownerID: g.ownerID,
+        timerEnd: g.timerEnd, index: g.index, ownerID: g.ownerID,
         attemptedThisQuestion: [...g.attemptedThisQuestion],
       },
     });
-  } catch (err) {
-    console.error('[saveGameState]', err.message);
+  } catch (e) {
+    console.error('[saveGameState]', e.message);
   }
 }
 
@@ -298,7 +288,7 @@ function clearAllTimeouts(game) {
 }
 
 async function sendImage(api, threadID, buffer) {
-  const tmpPath = path.join(__dirname, `quiz_img_${threadID}_${Date.now()}.png`);
+  const tmpPath = path.join(__dirname, `quiz_${threadID}_${Date.now()}.png`);
   fs.writeFileSync(tmpPath, buffer);
   try {
     await api.sendMessage({ attachment: fs.createReadStream(tmpPath) }, threadID);
@@ -311,15 +301,12 @@ async function stopGame(threadID, api, silent = false) {
   const game = activeGames.get(threadID);
   if (!game || !game.active) return;
   clearAllTimeouts(game);
-  unregReply(game.configMsgID);
   game.active = false;
-  game.state = 'idle';
   game.configStep = null;
   game.configLock = false;
-  game.joinPhase = null;
   game.questionLock = false;
   game.messageID = null;
-  game.configMsgID = null;
+  game.joinPhase = null;
   game.attemptedThisQuestion = new Set();
   await apiDelete(`/game/stop/${threadID}`).catch(() => {});
   if (!silent) await plain(api, threadID, t(threadID, 'stopped')).catch(() => {});
@@ -328,9 +315,9 @@ async function stopGame(threadID, api, silent = false) {
 
 function wrapText(ctx, text, maxWidth) {
   const lines = [];
-  for (const paragraph of String(text).split('\n')) {
+  for (const para of String(text).split('\n')) {
     let cur = '';
-    for (const w of paragraph.split(' ')) {
+    for (const w of para.split(' ')) {
       const test = cur ? `${cur} ${w}` : w;
       if (ctx.measureText(test).width > maxWidth && cur) { lines.push(cur); cur = w; }
       else cur = test;
@@ -342,9 +329,9 @@ function wrapText(ctx, text, maxWidth) {
 
 async function drawQuestion(question, index, total) {
   const mc = createCanvas(800, 100);
-  const mctx = mc.getContext('2d');
-  mctx.font = '22px Arial';
-  const lines = wrapText(mctx, sanitize(question), 740);
+  const mc2 = mc.getContext('2d');
+  mc2.font = '22px Arial';
+  const lines = wrapText(mc2, sanitize(question), 740);
   const h = Math.max(300, 130 + lines.length * 38 + 30);
   const canvas = createCanvas(800, h);
   const ctx = canvas.getContext('2d');
@@ -435,10 +422,10 @@ async function nextQuestion(api, threadID) {
   const game = activeGames.get(threadID);
   if (!game || !game.active || game.questionLock) return;
   game.questionLock = true;
+  game.messageID = null;
 
   try {
     if (game.timer) { clearTimeout(game.timer); game.timer = null; }
-    game.messageID = null;
 
     if (game.index >= game.total) {
       game.questionLock = false;
@@ -480,6 +467,7 @@ async function nextQuestion(api, threadID) {
     if (!activeGames.get(threadID)?.active) return;
 
     game.messageID = sent.messageID;
+    game.timerEnd = Date.now() + TIMEOUTS.QUESTION;
 
     try {
       const img = await drawQuestion(game.currentQuestion, game.index, game.total);
@@ -488,7 +476,6 @@ async function nextQuestion(api, threadID) {
       console.error('[nextQuestion img]', e.message);
     }
 
-    game.timerEnd = Date.now() + TIMEOUTS.QUESTION;
     game.questionLock = false;
 
     const capturedMsgID = sent.messageID;
@@ -496,6 +483,7 @@ async function nextQuestion(api, threadID) {
       const g = activeGames.get(threadID);
       if (!g || !g.active || g.messageID !== capturedMsgID || g.questionLock) return;
       g.questionLock = true;
+      g.messageID = null;
       try { await plain(api, threadID, t(threadID, 'timeout', g.answer)); } catch(e) {}
       g.questionLock = false;
       await nextQuestion(api, threadID);
@@ -517,9 +505,7 @@ async function endGame(api, threadID) {
   const game = activeGames.get(threadID);
   if (!game || !game.active) return;
   clearAllTimeouts(game);
-  unregReply(game.configMsgID);
   game.active = false;
-  game.state = 'idle';
 
   let summary = `${t(threadID, 'end_title')}\n\n`;
   let winner = '', ws = 0, loser = '', ls = 0;
@@ -542,13 +528,17 @@ async function endGame(api, threadID) {
       const wname = await getUserName(api, wid);
       summary += t(threadID, 'solo_win_rank', wname, wpts, getRank(wpts));
       winner = wname; ws = wpts;
-      if (sorted.length > 1) { loser = await getUserName(api, sorted[1][0]); ls = sorted[1][1]; }
+      if (sorted.length > 1) {
+        loser = await getUserName(api, sorted[1][0]);
+        ls = sorted[1][1];
+      }
     } else {
       summary += t(threadID, 'no_score');
     }
   }
 
   await announce(api, threadID, summary);
+
   if (winner && loser) {
     try {
       const img = await drawVictory(winner, ws, loser, ls, t(threadID, 'victory_title'));
@@ -557,6 +547,7 @@ async function endGame(api, threadID) {
       console.error('[endGame img]', e.message);
     }
   }
+
   await apiDelete(`/game/stop/${threadID}`).catch(() => {});
   activeGames.delete(threadID);
 }
@@ -639,21 +630,18 @@ async function startTeamQuiz(api, threadID) {
 
 async function handleAnswer(api, event, threadID, senderID) {
   const game = activeGames.get(threadID);
-  if (!game || !game.active || game.questionLock) return;
-  if (!game.messageID) return;
+  if (!game || !game.active || game.questionLock || !game.messageID) return;
   if (event.messageReply?.messageID !== game.messageID) return;
-
-  if (game.mode === 'team') {
-    if (!game.teamA.includes(senderID) && !game.teamB.includes(senderID)) return;
-  }
-
+  if (game.mode === 'team' && !game.teamA.includes(senderID) && !game.teamB.includes(senderID)) return;
   if (!game.attemptedThisQuestion) game.attemptedThisQuestion = new Set();
   if (game.attemptedThisQuestion.has(senderID)) return;
+
   game.attemptedThisQuestion.add(senderID);
   game.questionLock = true;
 
   try {
     if (game.timer) { clearTimeout(game.timer); game.timer = null; }
+
     const senderName = await getUserName(api, senderID);
     const userAnswer = normalize(sanitize(event.body));
     let correct = false;
@@ -693,6 +681,7 @@ async function handleAnswer(api, event, threadID, senderID) {
       }
       game.questionLock = false;
       await nextQuestion(api, threadID);
+
     } else {
       await api.setMessageReaction('❌', event.messageID, () => {}).catch(() => {});
       apiPost('/user/update', {
@@ -705,6 +694,7 @@ async function handleAnswer(api, event, threadID, senderID) {
           const g = activeGames.get(threadID);
           if (!g || !g.active || g.messageID !== capturedMsgID || g.questionLock) return;
           g.questionLock = true;
+          g.messageID = null;
           try { await plain(api, threadID, t(threadID, 'timeout', g.answer)); } catch(e) {}
           g.questionLock = false;
           await nextQuestion(api, threadID);
@@ -723,51 +713,6 @@ async function handleAnswer(api, event, threadID, senderID) {
   }
 }
 
-async function dispatchConfigInput(api, threadID, step, body) {
-  if (!body) return;
-  const game = activeGames.get(threadID);
-  if (!game || !game.active || game.configLock) return;
-
-  if (step === 'category') {
-    if (['1','2','3','4','5','6','7','8','9'].includes(body)) {
-      await runConfig(api, threadID, 'category', body);
-    } else {
-      await plain(api, threadID, t(threadID, 'cfg_hint_category'));
-    }
-  } else if (step === 'customCategory') {
-    await runConfig(api, threadID, 'customCategory', body);
-  } else if (step === 'difficulty') {
-    if (['1','2','3'].includes(body)) {
-      await runConfig(api, threadID, 'difficulty', body);
-    } else {
-      await plain(api, threadID, t(threadID, 'cfg_hint_difficulty'));
-    }
-  } else if (step === 'total') {
-    const n = parseInt(body, 10);
-    if (!isNaN(n) && n >= 5 && n <= 50) {
-      await runConfig(api, threadID, 'total', body);
-    } else {
-      await plain(api, threadID, t(threadID, 'cfg_hint_total'));
-    }
-  } else if (step === 'suggestions') {
-    if (['1','2'].includes(body)) {
-      await runConfig(api, threadID, 'suggestions', body);
-    } else {
-      await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
-    }
-  } else if (step === 'teamAName') {
-    await runConfig(api, threadID, 'teamAName', body);
-  } else if (step === 'teamBName') {
-    await runConfig(api, threadID, 'teamBName', body);
-  } else if (step === 'teamSize') {
-    if (['1','2'].includes(body)) {
-      await runConfig(api, threadID, 'teamSize', body);
-    } else {
-      await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
-    }
-  }
-}
-
 async function runConfig(api, threadID, step, value) {
   const game = activeGames.get(threadID);
   if (!game || !game.active || game.configLock) return;
@@ -775,23 +720,17 @@ async function runConfig(api, threadID, step, value) {
 
   try {
     clearAllTimeouts(game);
-    if (game.configMsgID) { unregReply(game.configMsgID); game.configMsgID = null; }
 
-    const sched = (key, ms, notifMsg, fn) => {
-      game.choiceTimeouts[key] = setTimeout(async () => {
+    const next = async (msg, nextStep, schedKey, schedMs, schedDefault, schedValue) => {
+      game.configStep = nextStep;
+      await plain(api, threadID, msg);
+      game.choiceTimeouts[schedKey] = setTimeout(async () => {
         const g = activeGames.get(threadID);
         if (!g?.active || g.configLock) return;
-        await plain(api, threadID, notifMsg).catch(() => {});
+        await plain(api, threadID, t(threadID, 'cfg_timeout_default', schedDefault)).catch(() => {});
         if (!activeGames.get(threadID)?.active) return;
-        await fn();
-      }, ms);
-    };
-
-    const regCfgMsg = async (msg, nextStep) => {
-      const sent = await plain(api, threadID, msg);
-      game.configMsgID = sent.messageID;
-      regReply(sent.messageID, { type: 'quiz_config', threadID, step: nextStep, ownerID: game.ownerID });
-      return sent;
+        await runConfig(api, threadID, nextStep, schedValue);
+      }, schedMs);
     };
 
     if (step === 'category') {
@@ -799,42 +738,31 @@ async function runConfig(api, threadID, step, value) {
       const mapEn = { '1': 'General Knowledge', '2': 'Manga and Anime', '3': 'History', '4': 'Geography', '5': 'Science', '6': 'Arts', '7': 'Sports', '8': 'Cinema' };
       const map = getLang(threadID) === 'en' ? mapEn : mapFr;
       if (value === '9') {
-        game.configStep = 'customCategory';
-        await regCfgMsg(t(threadID, 'cfg_custom'), 'customCategory');
-        sched('cat', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', t(threadID, 'default_cat')), () => runConfig(api, threadID, 'customCategory', t(threadID, 'default_cat')));
+        await next(t(threadID, 'cfg_custom'), 'customCategory', 'cat', TIMEOUTS.CONFIG, t(threadID, 'default_cat'), t(threadID, 'default_cat'));
         return;
       }
       game.category = map[value] || t(threadID, 'default_cat');
-      game.configStep = 'difficulty';
-      await regCfgMsg(t(threadID, 'cfg_diff', game.category), 'difficulty');
-      sched('diff', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', 'Moyen'), () => runConfig(api, threadID, 'difficulty', '2'));
+      await next(t(threadID, 'cfg_diff', game.category), 'difficulty', 'diff', TIMEOUTS.CONFIG, 'Moyen', '2');
 
     } else if (step === 'customCategory') {
       game.category = sanitize(value).slice(0, 40) || t(threadID, 'default_cat');
-      game.configStep = 'difficulty';
-      await regCfgMsg(t(threadID, 'cfg_diff', game.category), 'difficulty');
-      sched('diff', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', 'Moyen'), () => runConfig(api, threadID, 'difficulty', '2'));
+      await next(t(threadID, 'cfg_diff', game.category), 'difficulty', 'diff', TIMEOUTS.CONFIG, 'Moyen', '2');
 
     } else if (step === 'difficulty') {
       const lang = getLang(threadID);
       const map = { '1': lang === 'en' ? 'easy' : 'facile', '2': lang === 'en' ? 'medium' : 'moyen', '3': lang === 'en' ? 'hard' : 'difficile' };
       game.difficulty = map[value] || t(threadID, 'default_diff');
-      game.configStep = 'total';
-      await regCfgMsg(t(threadID, 'cfg_total', game.difficulty), 'total');
-      sched('total', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', '20 questions'), () => runConfig(api, threadID, 'total', '20'));
+      await next(t(threadID, 'cfg_total', game.difficulty), 'total', 'total', TIMEOUTS.CONFIG, '20 questions', '20');
 
     } else if (step === 'total') {
       const n = parseInt(value, 10);
       game.total = (!isNaN(n) && n >= 5 && n <= 50) ? n : 20;
-      game.configStep = 'suggestions';
-      await regCfgMsg(t(threadID, 'cfg_sugg', game.total), 'suggestions');
-      sched('sugg', TIMEOUTS.CHOICE, t(threadID, 'cfg_timeout_default', 'Non — sans suggestions'), () => runConfig(api, threadID, 'suggestions', '2'));
+      await next(t(threadID, 'cfg_sugg', game.total), 'suggestions', 'sugg', TIMEOUTS.CHOICE, 'Non — sans suggestions', '2');
 
     } else if (step === 'suggestions') {
       game.suggestions = (value === '1');
       if (game.mode === 'solo') {
         game.configStep = null;
-        game.configMsgID = null;
         saveGameState(threadID).catch(() => {});
         try {
           const img = await drawStart('solo', '', '');
@@ -843,27 +771,20 @@ async function runConfig(api, threadID, step, value) {
         await plain(api, threadID, t(threadID, 'start_solo'));
         await nextQuestion(api, threadID);
       } else {
-        game.configStep = 'teamAName';
-        await regCfgMsg(t(threadID, 'cfg_teamA'), 'teamAName');
-        sched('nameA', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', t(threadID, 'default_teamA')), () => runConfig(api, threadID, 'teamAName', t(threadID, 'default_teamA')));
+        await next(t(threadID, 'cfg_teamA'), 'teamAName', 'nameA', TIMEOUTS.CONFIG, t(threadID, 'default_teamA'), t(threadID, 'default_teamA'));
       }
 
     } else if (step === 'teamAName') {
       game.teamAName = sanitize(value).slice(0, NAME_MAX_LEN) || t(threadID, 'default_teamA');
-      game.configStep = 'teamBName';
-      await regCfgMsg(t(threadID, 'cfg_teamB', game.teamAName), 'teamBName');
-      sched('nameB', TIMEOUTS.CONFIG, t(threadID, 'cfg_timeout_default', t(threadID, 'default_teamB')), () => runConfig(api, threadID, 'teamBName', t(threadID, 'default_teamB')));
+      await next(t(threadID, 'cfg_teamB', game.teamAName), 'teamBName', 'nameB', TIMEOUTS.CONFIG, t(threadID, 'default_teamB'), t(threadID, 'default_teamB'));
 
     } else if (step === 'teamBName') {
       game.teamBName = sanitize(value).slice(0, NAME_MAX_LEN) || t(threadID, 'default_teamB');
-      game.configStep = 'teamSize';
-      await regCfgMsg(t(threadID, 'cfg_size', game.teamBName), 'teamSize');
-      sched('size', TIMEOUTS.CHOICE, t(threadID, 'cfg_timeout_default', 'Libre'), () => runConfig(api, threadID, 'teamSize', '2'));
+      await next(t(threadID, 'cfg_size', game.teamBName), 'teamSize', 'size', TIMEOUTS.CHOICE, 'Libre', '2');
 
     } else if (step === 'teamSize') {
       game.teamSize = (value === '1') ? 'reglo' : 'libre';
       game.configStep = null;
-      game.configMsgID = null;
       game.joinPhase = 'A';
       await plain(api, threadID, t(threadID, 'cfg_teamA_go', game.teamAName, TIMEOUTS.JOIN / 1000));
       game.joinTimeout = setTimeout(() => finishTeamCreation(api, threadID), TIMEOUTS.JOIN);
@@ -876,13 +797,13 @@ async function runConfig(api, threadID, step, value) {
 }
 
 module.exports = {
-  config: { name: 'quiz', version: '2.3', author: "Octavio & L'Uchiha Perdu", role: 0, category: 'game' },
+  config: { name: 'quiz', version: '2.4', author: "Octavio & L'Uchiha Perdu", role: 0, category: 'game' },
 
   onStart: async function({ api, event, args }) {
     await fetchBotName(api);
     const threadID = event.threadID;
     const senderID = event.senderID;
-    const cmd = args[0]?.toLowerCase();
+    const cmd = (args[0] || '').toLowerCase();
 
     if (cmd === 'stop') {
       const game = activeGames.get(threadID);
@@ -892,7 +813,7 @@ module.exports = {
     }
 
     if (cmd === 'changelang') {
-      const lang = args[1]?.toLowerCase();
+      const lang = (args[1] || '').toLowerCase();
       if (lang !== 'fr' && lang !== 'en') return plain(api, threadID, t(threadID, 'lang_bad'));
       langSettings.set(threadID, lang);
       return plain(api, threadID, t(threadID, 'lang_changed'));
@@ -914,7 +835,9 @@ module.exports = {
         const senderName = await getUserName(api, senderID);
         const res = await apiGet(`/user/${senderID}`);
         const u = res.data;
-        return announce(api, threadID, `${t(threadID, 'profile_header', senderName, getRank(u.pts || 0))}\n\n${t(threadID, 'profile_stats', u.pts || 0, u.streak || 0, u.bestStreak || 0)}`);
+        return announce(api, threadID,
+          `${t(threadID, 'profile_header', senderName, getRank(u.pts || 0))}\n\n${t(threadID, 'profile_stats', u.pts || 0, u.streak || 0, u.bestStreak || 0)}`
+        );
       } catch (_) {
         return plain(api, threadID, t(threadID, 'rank_err'));
       }
@@ -929,22 +852,19 @@ module.exports = {
     }
 
     if (cmd === 'start') {
-      const existingGame = activeGames.get(threadID);
-      if (existingGame && existingGame.active) return plain(api, threadID, t(threadID, 'already_running'));
-      const sub = args[1]?.toLowerCase();
+      const existing = activeGames.get(threadID);
+      if (existing && existing.active) return plain(api, threadID, t(threadID, 'already_running'));
+      const sub = (args[1] || '').toLowerCase();
       if (sub !== 'solo' && sub !== 'team') return plain(api, threadID, t(threadID, 'bad_start_cmd'));
 
       const game = makeGame();
       game.active = true;
       game.mode = sub;
       game.ownerID = senderID;
-      game.state = 'config';
       game.configStep = 'category';
       activeGames.set(threadID, game);
 
-      const sent = await plain(api, threadID, t(threadID, 'cfg_cat'));
-      game.configMsgID = sent.messageID;
-      regReply(sent.messageID, { type: 'quiz_config', threadID, step: 'category', ownerID: senderID });
+      await plain(api, threadID, t(threadID, 'cfg_cat'));
 
       game.choiceTimeouts.cat = setTimeout(async () => {
         const g = activeGames.get(threadID);
@@ -968,22 +888,6 @@ module.exports = {
     return announce(api, threadID, t(threadID, 'cmd_list'));
   },
 
-  onReply: async function({ api, event, Reply }) {
-    if (!Reply || !Reply.type) return;
-    if (Reply.type !== 'quiz_config') return;
-
-    const { threadID, step: storedStep, ownerID } = Reply;
-    if (event.senderID !== ownerID) return;
-
-    const game = activeGames.get(threadID);
-    if (!game || !game.active) return;
-    if (game.configStep !== storedStep) return;
-    if (game.configLock) return;
-
-    const body = (event.body || '').trim();
-    await dispatchConfigInput(api, threadID, storedStep, body);
-  },
-
   handleEvent: async function({ api, event }) {
     const threadID = event.threadID;
     const senderID = event.senderID;
@@ -992,8 +896,62 @@ module.exports = {
 
     const body = (event.body || '').trim();
 
-    if (game.configStep && game.ownerID === senderID && !game.configLock) {
-      await dispatchConfigInput(api, threadID, game.configStep, body);
+    if (game.configStep && senderID === game.ownerID && !game.configLock) {
+      const step = game.configStep;
+
+      if (step === 'category') {
+        if (['1','2','3','4','5','6','7','8','9'].includes(body)) {
+          await runConfig(api, threadID, 'category', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_category'));
+        }
+        return;
+      }
+      if (step === 'customCategory') {
+        if (body) await runConfig(api, threadID, 'customCategory', body);
+        return;
+      }
+      if (step === 'difficulty') {
+        if (['1','2','3'].includes(body)) {
+          await runConfig(api, threadID, 'difficulty', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_difficulty'));
+        }
+        return;
+      }
+      if (step === 'total') {
+        const n = parseInt(body, 10);
+        if (!isNaN(n) && n >= 5 && n <= 50) {
+          await runConfig(api, threadID, 'total', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_total'));
+        }
+        return;
+      }
+      if (step === 'suggestions') {
+        if (['1','2'].includes(body)) {
+          await runConfig(api, threadID, 'suggestions', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
+        }
+        return;
+      }
+      if (step === 'teamAName') {
+        if (body) await runConfig(api, threadID, 'teamAName', body);
+        return;
+      }
+      if (step === 'teamBName') {
+        if (body) await runConfig(api, threadID, 'teamBName', body);
+        return;
+      }
+      if (step === 'teamSize') {
+        if (['1','2'].includes(body)) {
+          await runConfig(api, threadID, 'teamSize', body);
+        } else if (body) {
+          await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
+        }
+        return;
+      }
       return;
     }
 
