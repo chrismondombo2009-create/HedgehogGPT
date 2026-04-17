@@ -172,6 +172,20 @@ function getRank(pts) {
   return RANKS[RANKS.length - 1][1];
 }
 
+function regReply(msgID, data) {
+  try {
+    if (global.GoatBot?.onReply) {
+      global.GoatBot.onReply.set(msgID, { commandName: 'quiz', ...data });
+    }
+  } catch(e) {}
+}
+
+function unregReply(msgID) {
+  try {
+    if (msgID && global.GoatBot?.onReply) global.GoatBot.onReply.delete(msgID);
+  } catch(e) {}
+}
+
 let botName = 'QuizBot';
 let botNameFetched = false;
 
@@ -183,9 +197,7 @@ async function fetchBotName(api) {
     if (!uid) return;
     const info = await api.getUserInfo(uid);
     if (info[uid]?.name) botName = info[uid].name;
-  } catch (e) {
-    botNameFetched = false;
-  }
+  } catch(e) { botNameFetched = false; }
 }
 
 async function getUserName(api, id) {
@@ -196,57 +208,34 @@ async function getUserName(api, id) {
     const name = sanitize(info[id]?.name || 'Joueur');
     nameCache.set(id, { name, ts: Date.now() });
     return name;
-  } catch (e) {
-    return 'Inconnu';
-  }
+  } catch(e) { return 'Inconnu'; }
 }
 
 function makeGame() {
   return {
-    active: false,
-    mode: null,
-    category: null,
-    difficulty: null,
-    total: 20,
-    suggestions: false,
-    teamSize: 'libre',
-    teamAName: null,
-    teamBName: null,
-    teamA: [],
-    teamB: [],
-    teamAScore: 0,
-    teamBScore: 0,
-    scores: {},
-    sessionCorrect: {},
-    currentQuestion: null,
-    answer: null,
-    suggestionsList: null,
-    messageID: null,
-    timer: null,
-    timerEnd: 0,
-    index: 0,
-    configStep: null,
-    configLock: false,
-    joinPhase: null,
-    joinTimeout: null,
-    questionLock: false,
-    ownerID: null,
-    choiceTimeouts: {},
-    attemptedThisQuestion: new Set(),
+    active: false, mode: null, category: null, difficulty: null,
+    total: 20, suggestions: false, teamSize: 'libre',
+    teamAName: null, teamBName: null,
+    teamA: [], teamB: [], teamAScore: 0, teamBScore: 0,
+    scores: {}, sessionCorrect: {},
+    currentQuestion: null, answer: null, suggestionsList: null,
+    messageID: null, timer: null, timerEnd: 0, index: 0,
+    configStep: null, configLock: false,
+    joinPhase: null, joinTimeout: null,
+    questionLock: false, ownerID: null,
+    choiceTimeouts: {}, attemptedThisQuestion: new Set(),
   };
 }
 
-async function apiPost(path, data) {
-  const timeout = path.includes('/quiz/question') ? API_TIMEOUT.question : API_TIMEOUT.default;
-  return axios.post(`${API_BASE}${path}`, data, { headers: API_HEADERS, timeout });
+async function apiPost(p, data) {
+  const to = p.includes('/quiz/question') ? API_TIMEOUT.question : API_TIMEOUT.default;
+  return axios.post(`${API_BASE}${p}`, data, { headers: API_HEADERS, timeout: to });
 }
-
-async function apiGet(path) {
-  return axios.get(`${API_BASE}${path}`, { headers: API_HEADERS, timeout: API_TIMEOUT.default });
+async function apiGet(p) {
+  return axios.get(`${API_BASE}${p}`, { headers: API_HEADERS, timeout: API_TIMEOUT.default });
 }
-
-async function apiDelete(path) {
-  return axios.delete(`${API_BASE}${path}`, { headers: API_HEADERS, timeout: API_TIMEOUT.default });
+async function apiDelete(p) {
+  return axios.delete(`${API_BASE}${p}`, { headers: API_HEADERS, timeout: API_TIMEOUT.default });
 }
 
 async function saveGameState(threadID) {
@@ -267,15 +256,12 @@ async function saveGameState(threadID) {
         attemptedThisQuestion: [...g.attemptedThisQuestion],
       },
     });
-  } catch (e) {
-    console.error('[saveGameState]', e.message);
-  }
+  } catch(e) { console.error('[saveGameState]', e.message); }
 }
 
 function announce(api, threadID, text) {
   return api.sendMessage({ body: `—————«•»—————\n${text}\n—————«•»—————` }, threadID);
 }
-
 function plain(api, threadID, text) {
   return api.sendMessage({ body: text }, threadID);
 }
@@ -288,12 +274,12 @@ function clearAllTimeouts(game) {
 }
 
 async function sendImage(api, threadID, buffer) {
-  const tmpPath = path.join(__dirname, `quiz_${threadID}_${Date.now()}.png`);
-  fs.writeFileSync(tmpPath, buffer);
+  const tmp = path.join(__dirname, `quiz_${threadID}_${Date.now()}.png`);
+  fs.writeFileSync(tmp, buffer);
   try {
-    await api.sendMessage({ attachment: fs.createReadStream(tmpPath) }, threadID);
+    await api.sendMessage({ attachment: fs.createReadStream(tmp) }, threadID);
   } finally {
-    try { fs.unlinkSync(tmpPath); } catch(e) {}
+    try { fs.unlinkSync(tmp); } catch(e) {}
   }
 }
 
@@ -301,6 +287,7 @@ async function stopGame(threadID, api, silent = false) {
   const game = activeGames.get(threadID);
   if (!game || !game.active) return;
   clearAllTimeouts(game);
+  unregReply(game.messageID);
   game.active = false;
   game.configStep = null;
   game.configLock = false;
@@ -329,22 +316,18 @@ function wrapText(ctx, text, maxWidth) {
 
 async function drawQuestion(question, index, total) {
   const mc = createCanvas(800, 100);
-  const mc2 = mc.getContext('2d');
-  mc2.font = '22px Arial';
-  const lines = wrapText(mc2, sanitize(question), 740);
+  const mctx = mc.getContext('2d');
+  mctx.font = '22px Arial';
+  const lines = wrapText(mctx, sanitize(question), 740);
   const h = Math.max(300, 130 + lines.length * 38 + 30);
   const canvas = createCanvas(800, h);
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, 800, h);
-  ctx.fillStyle = '#c0392b';
-  ctx.font = 'bold 18px Arial';
+  ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, 800, h);
+  ctx.fillStyle = '#c0392b'; ctx.font = 'bold 18px Arial';
   ctx.fillText(`${index} / ${total}`, 30, 44);
-  ctx.strokeStyle = '#c0392b';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(30, 54); ctx.lineTo(770, 54); ctx.stroke();
-  ctx.fillStyle = '#ecf0f1';
-  ctx.font = '22px Arial';
+  ctx.fillStyle = '#ecf0f1'; ctx.font = '22px Arial';
   let y = 100;
   for (const line of lines) { ctx.fillText(line, 30, y); y += 38; }
   return canvas.toBuffer();
@@ -353,25 +336,18 @@ async function drawQuestion(question, index, total) {
 async function drawVictory(winner, ws, loser, ls, victoryTitle) {
   const canvas = createCanvas(800, 380);
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#0f3460';
-  ctx.fillRect(0, 0, 800, 380);
-  ctx.strokeStyle = '#c0392b';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(10, 10, 780, 360);
-  ctx.fillStyle = '#ecf0f1';
-  ctx.font = 'bold 36px Arial';
+  ctx.fillStyle = '#0f3460'; ctx.fillRect(0, 0, 800, 380);
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 3; ctx.strokeRect(10, 10, 780, 360);
+  ctx.fillStyle = '#ecf0f1'; ctx.font = 'bold 36px Arial';
   const title = sanitize(victoryTitle || 'VICTOIRE').slice(0, 30);
   ctx.fillText(title, (800 - ctx.measureText(title).width) / 2, 80);
-  ctx.fillStyle = '#f1c40f';
-  ctx.font = 'bold 28px Arial';
+  ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 28px Arial';
   const wt = sanitize(winner).slice(0, 30);
   ctx.fillText(wt, (800 - ctx.measureText(wt).width) / 2, 160);
-  ctx.fillStyle = '#ecf0f1';
-  ctx.font = '24px Arial';
+  ctx.fillStyle = '#ecf0f1'; ctx.font = '24px Arial';
   const st = `${ws} pts`;
   ctx.fillText(st, (800 - ctx.measureText(st).width) / 2, 210);
-  ctx.fillStyle = '#7f8c8d';
-  ctx.font = '18px Arial';
+  ctx.fillStyle = '#7f8c8d'; ctx.font = '18px Arial';
   const lt = `${sanitize(loser).slice(0, 30)} : ${ls} pts`;
   ctx.fillText(lt, (800 - ctx.measureText(lt).width) / 2, 290);
   return canvas.toBuffer();
@@ -380,24 +356,15 @@ async function drawVictory(winner, ws, loser, ls, victoryTitle) {
 async function drawStart(mode, teamAName, teamBName) {
   const canvas = createCanvas(800, 360);
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#16213e';
-  ctx.fillRect(0, 0, 800, 360);
-  ctx.strokeStyle = '#c0392b';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(10, 10, 780, 340);
-  ctx.fillStyle = '#ecf0f1';
-  ctx.font = 'bold 32px Arial';
-  ctx.fillText('QUIZ', 360, 70);
+  ctx.fillStyle = '#16213e'; ctx.fillRect(0, 0, 800, 360);
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2; ctx.strokeRect(10, 10, 780, 340);
+  ctx.fillStyle = '#ecf0f1'; ctx.font = 'bold 32px Arial'; ctx.fillText('QUIZ', 360, 70);
   if (mode === 'team') {
     ctx.font = '24px Arial';
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillText(sanitize(teamAName).slice(0, 30), 300, 170);
-    ctx.fillStyle = '#3498db';
-    ctx.fillText(sanitize(teamBName).slice(0, 30), 300, 250);
+    ctx.fillStyle = '#e74c3c'; ctx.fillText(sanitize(teamAName).slice(0, 30), 300, 170);
+    ctx.fillStyle = '#3498db'; ctx.fillText(sanitize(teamBName).slice(0, 30), 300, 250);
   } else {
-    ctx.fillStyle = '#bdc3c7';
-    ctx.font = '24px Arial';
-    ctx.fillText('Solo', 380, 190);
+    ctx.fillStyle = '#bdc3c7'; ctx.font = '24px Arial'; ctx.fillText('Solo', 380, 190);
   }
   return canvas.toBuffer();
 }
@@ -422,11 +389,11 @@ async function nextQuestion(api, threadID) {
   const game = activeGames.get(threadID);
   if (!game || !game.active || game.questionLock) return;
   game.questionLock = true;
-  game.messageID = null;
+
+  if (game.messageID) { unregReply(game.messageID); game.messageID = null; }
+  if (game.timer) { clearTimeout(game.timer); game.timer = null; }
 
   try {
-    if (game.timer) { clearTimeout(game.timer); game.timer = null; }
-
     if (game.index >= game.total) {
       game.questionLock = false;
       await endGame(api, threadID);
@@ -438,9 +405,7 @@ async function nextQuestion(api, threadID) {
 
     const res = await apiPost('/quiz/question', {
       mode: game.suggestions ? 'suggestions' : 'free',
-      category: game.category,
-      difficulty: game.difficulty,
-      threadId: threadID,
+      category: game.category, difficulty: game.difficulty, threadId: threadID,
     });
 
     if (!activeGames.get(threadID)?.active) return;
@@ -467,15 +432,14 @@ async function nextQuestion(api, threadID) {
     if (!activeGames.get(threadID)?.active) return;
 
     game.messageID = sent.messageID;
-    game.timerEnd = Date.now() + TIMEOUTS.QUESTION;
+    regReply(sent.messageID, { type: 'quiz_answer', threadID });
 
     try {
       const img = await drawQuestion(game.currentQuestion, game.index, game.total);
       await sendImage(api, threadID, img);
-    } catch(e) {
-      console.error('[nextQuestion img]', e.message);
-    }
+    } catch(e) { console.error('[nextQuestion img]', e.message); }
 
+    game.timerEnd = Date.now() + TIMEOUTS.QUESTION;
     game.questionLock = false;
 
     const capturedMsgID = sent.messageID;
@@ -483,6 +447,7 @@ async function nextQuestion(api, threadID) {
       const g = activeGames.get(threadID);
       if (!g || !g.active || g.messageID !== capturedMsgID || g.questionLock) return;
       g.questionLock = true;
+      unregReply(capturedMsgID);
       g.messageID = null;
       try { await plain(api, threadID, t(threadID, 'timeout', g.answer)); } catch(e) {}
       g.questionLock = false;
@@ -491,7 +456,7 @@ async function nextQuestion(api, threadID) {
 
     saveGameState(threadID).catch(() => {});
 
-  } catch (err) {
+  } catch(err) {
     console.error('[nextQuestion]', err.message);
     game.questionLock = false;
     if (activeGames.get(threadID)?.active) {
@@ -505,6 +470,7 @@ async function endGame(api, threadID) {
   const game = activeGames.get(threadID);
   if (!game || !game.active) return;
   clearAllTimeouts(game);
+  unregReply(game.messageID);
   game.active = false;
 
   let summary = `${t(threadID, 'end_title')}\n\n`;
@@ -528,120 +494,38 @@ async function endGame(api, threadID) {
       const wname = await getUserName(api, wid);
       summary += t(threadID, 'solo_win_rank', wname, wpts, getRank(wpts));
       winner = wname; ws = wpts;
-      if (sorted.length > 1) {
-        loser = await getUserName(api, sorted[1][0]);
-        ls = sorted[1][1];
-      }
-    } else {
-      summary += t(threadID, 'no_score');
-    }
+      if (sorted.length > 1) { loser = await getUserName(api, sorted[1][0]); ls = sorted[1][1]; }
+    } else { summary += t(threadID, 'no_score'); }
   }
 
   await announce(api, threadID, summary);
-
   if (winner && loser) {
     try {
       const img = await drawVictory(winner, ws, loser, ls, t(threadID, 'victory_title'));
       await sendImage(api, threadID, img);
-    } catch(e) {
-      console.error('[endGame img]', e.message);
-    }
+    } catch(e) { console.error('[endGame img]', e.message); }
   }
-
   await apiDelete(`/game/stop/${threadID}`).catch(() => {});
   activeGames.delete(threadID);
 }
 
-async function handleJoin(api, threadID, senderID) {
+async function processAnswer(api, event, threadID, senderID) {
   const game = activeGames.get(threadID);
-  if (!game || !game.active || game.mode !== 'team' || !game.joinPhase) return false;
-  const senderName = await getUserName(api, senderID);
-  if (game.teamA.includes(senderID) || game.teamB.includes(senderID)) {
-    await plain(api, threadID, t(threadID, 'join_already'));
-    return false;
-  }
-  if (game.joinPhase === 'A') {
-    if (game.teamSize === 'reglo' && game.teamA.length >= 5) {
-      await plain(api, threadID, t(threadID, 'join_full', game.teamAName));
-      return false;
-    }
-    game.teamA.push(senderID);
-    await plain(api, threadID, t(threadID, 'join_ok', senderName, game.teamAName));
-    if (game.teamSize === 'reglo' && game.teamA.length === 5) {
-      clearTimeout(game.joinTimeout);
-      game.joinPhase = 'B';
-      await plain(api, threadID, t(threadID, 'join_invite', game.teamBName, TIMEOUTS.JOIN / 1000));
-      game.joinTimeout = setTimeout(() => finishTeamCreation(api, threadID), TIMEOUTS.JOIN);
-    }
-  } else {
-    if (game.teamSize === 'reglo' && game.teamB.length >= 5) {
-      await plain(api, threadID, t(threadID, 'join_full', game.teamBName));
-      return false;
-    }
-    game.teamB.push(senderID);
-    await plain(api, threadID, t(threadID, 'join_ok', senderName, game.teamBName));
-    if (game.teamSize === 'reglo' && game.teamB.length === 5) {
-      clearTimeout(game.joinTimeout);
-      game.joinTimeout = null;
-      game.joinPhase = null;
-      await startTeamQuiz(api, threadID);
-    }
-  }
-  saveGameState(threadID).catch(() => {});
-  return true;
-}
+  if (!game || !game.active || game.questionLock) return;
 
-async function finishTeamCreation(api, threadID) {
-  const game = activeGames.get(threadID);
-  if (!game || !game.active || !game.joinPhase) return;
-  if (game.joinPhase === 'A') {
-    game.joinPhase = 'B';
-    await plain(api, threadID, t(threadID, 'join_timeout', game.teamAName, 'B'));
-    await plain(api, threadID, t(threadID, 'join_invite', game.teamBName, TIMEOUTS.JOIN / 1000));
-    game.joinTimeout = setTimeout(() => {
-      const g = activeGames.get(threadID);
-      if (g && g.active && g.joinPhase === 'B') { g.joinPhase = null; startTeamQuiz(api, threadID); }
-    }, TIMEOUTS.JOIN);
-  } else {
-    game.joinPhase = null;
-    await startTeamQuiz(api, threadID);
+  if (game.mode === 'team') {
+    if (!game.teamA.includes(senderID) && !game.teamB.includes(senderID)) return;
   }
-}
 
-async function startTeamQuiz(api, threadID) {
-  const game = activeGames.get(threadID);
-  if (!game || !game.active || game.mode !== 'team') return;
-  if (!game.teamA.length || !game.teamB.length) {
-    clearAllTimeouts(game);
-    game.active = false;
-    activeGames.delete(threadID);
-    await plain(api, threadID, t(threadID, 'no_players'));
-    return;
-  }
-  try {
-    const img = await drawStart('team', game.teamAName, game.teamBName);
-    await sendImage(api, threadID, img);
-  } catch(e) {}
-  await plain(api, threadID, t(threadID, 'start_team'));
-  const table = await buildTeamTable(api, threadID);
-  await api.sendMessage({ body: table }, threadID);
-  await nextQuestion(api, threadID);
-}
-
-async function handleAnswer(api, event, threadID, senderID) {
-  const game = activeGames.get(threadID);
-  if (!game || !game.active || game.questionLock || !game.messageID) return;
-  if (event.messageReply?.messageID !== game.messageID) return;
-  if (game.mode === 'team' && !game.teamA.includes(senderID) && !game.teamB.includes(senderID)) return;
   if (!game.attemptedThisQuestion) game.attemptedThisQuestion = new Set();
   if (game.attemptedThisQuestion.has(senderID)) return;
-
   game.attemptedThisQuestion.add(senderID);
   game.questionLock = true;
 
-  try {
-    if (game.timer) { clearTimeout(game.timer); game.timer = null; }
+  if (game.timer) { clearTimeout(game.timer); game.timer = null; }
+  unregReply(game.messageID);
 
+  try {
     const senderName = await getUserName(api, senderID);
     const userAnswer = normalize(sanitize(event.body));
     let correct = false;
@@ -657,9 +541,7 @@ async function handleAnswer(api, event, threadID, senderID) {
           question: game.currentQuestion, expected: game.answer, userAnswer, threadId: threadID,
         });
         correct = !!res.data?.correct;
-      } catch (_) {
-        correct = userAnswer === game.answer;
-      }
+      } catch(_) { correct = userAnswer === game.answer; }
     }
 
     if (correct) {
@@ -707,10 +589,74 @@ async function handleAnswer(api, event, threadID, senderID) {
       }
       saveGameState(threadID).catch(() => {});
     }
-  } catch (err) {
-    console.error('[handleAnswer]', err.message);
+  } catch(err) {
+    console.error('[processAnswer]', err.message);
     game.questionLock = false;
   }
+}
+
+async function handleJoin(api, threadID, senderID) {
+  const game = activeGames.get(threadID);
+  if (!game || !game.active || game.mode !== 'team' || !game.joinPhase) return false;
+  const senderName = await getUserName(api, senderID);
+  if (game.teamA.includes(senderID) || game.teamB.includes(senderID)) {
+    await plain(api, threadID, t(threadID, 'join_already')); return false;
+  }
+  if (game.joinPhase === 'A') {
+    if (game.teamSize === 'reglo' && game.teamA.length >= 5) {
+      await plain(api, threadID, t(threadID, 'join_full', game.teamAName)); return false;
+    }
+    game.teamA.push(senderID);
+    await plain(api, threadID, t(threadID, 'join_ok', senderName, game.teamAName));
+    if (game.teamSize === 'reglo' && game.teamA.length === 5) {
+      clearTimeout(game.joinTimeout);
+      game.joinPhase = 'B';
+      await plain(api, threadID, t(threadID, 'join_invite', game.teamBName, TIMEOUTS.JOIN / 1000));
+      game.joinTimeout = setTimeout(() => finishTeamCreation(api, threadID), TIMEOUTS.JOIN);
+    }
+  } else {
+    if (game.teamSize === 'reglo' && game.teamB.length >= 5) {
+      await plain(api, threadID, t(threadID, 'join_full', game.teamBName)); return false;
+    }
+    game.teamB.push(senderID);
+    await plain(api, threadID, t(threadID, 'join_ok', senderName, game.teamBName));
+    if (game.teamSize === 'reglo' && game.teamB.length === 5) {
+      clearTimeout(game.joinTimeout); game.joinTimeout = null; game.joinPhase = null;
+      await startTeamQuiz(api, threadID);
+    }
+  }
+  saveGameState(threadID).catch(() => {});
+  return true;
+}
+
+async function finishTeamCreation(api, threadID) {
+  const game = activeGames.get(threadID);
+  if (!game || !game.active || !game.joinPhase) return;
+  if (game.joinPhase === 'A') {
+    game.joinPhase = 'B';
+    await plain(api, threadID, t(threadID, 'join_timeout', game.teamAName, 'B'));
+    await plain(api, threadID, t(threadID, 'join_invite', game.teamBName, TIMEOUTS.JOIN / 1000));
+    game.joinTimeout = setTimeout(() => {
+      const g = activeGames.get(threadID);
+      if (g && g.active && g.joinPhase === 'B') { g.joinPhase = null; startTeamQuiz(api, threadID); }
+    }, TIMEOUTS.JOIN);
+  } else {
+    game.joinPhase = null;
+    await startTeamQuiz(api, threadID);
+  }
+}
+
+async function startTeamQuiz(api, threadID) {
+  const game = activeGames.get(threadID);
+  if (!game || !game.active || game.mode !== 'team') return;
+  if (!game.teamA.length || !game.teamB.length) {
+    clearAllTimeouts(game); game.active = false; activeGames.delete(threadID);
+    await plain(api, threadID, t(threadID, 'no_players')); return;
+  }
+  try { await sendImage(api, threadID, await drawStart('team', game.teamAName, game.teamBName)); } catch(e) {}
+  await plain(api, threadID, t(threadID, 'start_team'));
+  await api.sendMessage({ body: await buildTeamTable(api, threadID) }, threadID);
+  await nextQuestion(api, threadID);
 }
 
 async function runConfig(api, threadID, step, value) {
@@ -721,7 +667,7 @@ async function runConfig(api, threadID, step, value) {
   try {
     clearAllTimeouts(game);
 
-    const next = async (msg, nextStep, schedKey, schedMs, schedDefault, schedValue) => {
+    const proceed = async (msg, nextStep, schedKey, schedMs, schedDefault, schedValue) => {
       game.configStep = nextStep;
       await plain(api, threadID, msg);
       game.choiceTimeouts[schedKey] = setTimeout(async () => {
@@ -734,53 +680,50 @@ async function runConfig(api, threadID, step, value) {
     };
 
     if (step === 'category') {
-      const mapFr = { '1': 'Culture generale', '2': 'Mangas et Anime', '3': 'Histoire', '4': 'Geographie', '5': 'Sciences', '6': 'Arts', '7': 'Sport', '8': 'Cinema' };
-      const mapEn = { '1': 'General Knowledge', '2': 'Manga and Anime', '3': 'History', '4': 'Geography', '5': 'Science', '6': 'Arts', '7': 'Sports', '8': 'Cinema' };
+      const mapFr = { '1':'Culture generale','2':'Mangas et Anime','3':'Histoire','4':'Geographie','5':'Sciences','6':'Arts','7':'Sport','8':'Cinema' };
+      const mapEn = { '1':'General Knowledge','2':'Manga and Anime','3':'History','4':'Geography','5':'Science','6':'Arts','7':'Sports','8':'Cinema' };
       const map = getLang(threadID) === 'en' ? mapEn : mapFr;
       if (value === '9') {
-        await next(t(threadID, 'cfg_custom'), 'customCategory', 'cat', TIMEOUTS.CONFIG, t(threadID, 'default_cat'), t(threadID, 'default_cat'));
+        await proceed(t(threadID, 'cfg_custom'), 'customCategory', 'cat', TIMEOUTS.CONFIG, t(threadID, 'default_cat'), t(threadID, 'default_cat'));
         return;
       }
       game.category = map[value] || t(threadID, 'default_cat');
-      await next(t(threadID, 'cfg_diff', game.category), 'difficulty', 'diff', TIMEOUTS.CONFIG, 'Moyen', '2');
+      await proceed(t(threadID, 'cfg_diff', game.category), 'difficulty', 'diff', TIMEOUTS.CONFIG, 'Moyen', '2');
 
     } else if (step === 'customCategory') {
       game.category = sanitize(value).slice(0, 40) || t(threadID, 'default_cat');
-      await next(t(threadID, 'cfg_diff', game.category), 'difficulty', 'diff', TIMEOUTS.CONFIG, 'Moyen', '2');
+      await proceed(t(threadID, 'cfg_diff', game.category), 'difficulty', 'diff', TIMEOUTS.CONFIG, 'Moyen', '2');
 
     } else if (step === 'difficulty') {
       const lang = getLang(threadID);
-      const map = { '1': lang === 'en' ? 'easy' : 'facile', '2': lang === 'en' ? 'medium' : 'moyen', '3': lang === 'en' ? 'hard' : 'difficile' };
+      const map = { '1': lang === 'en' ? 'easy':'facile', '2': lang === 'en' ? 'medium':'moyen', '3': lang === 'en' ? 'hard':'difficile' };
       game.difficulty = map[value] || t(threadID, 'default_diff');
-      await next(t(threadID, 'cfg_total', game.difficulty), 'total', 'total', TIMEOUTS.CONFIG, '20 questions', '20');
+      await proceed(t(threadID, 'cfg_total', game.difficulty), 'total', 'total', TIMEOUTS.CONFIG, '20 questions', '20');
 
     } else if (step === 'total') {
       const n = parseInt(value, 10);
       game.total = (!isNaN(n) && n >= 5 && n <= 50) ? n : 20;
-      await next(t(threadID, 'cfg_sugg', game.total), 'suggestions', 'sugg', TIMEOUTS.CHOICE, 'Non — sans suggestions', '2');
+      await proceed(t(threadID, 'cfg_sugg', game.total), 'suggestions', 'sugg', TIMEOUTS.CHOICE, 'Non — sans suggestions', '2');
 
     } else if (step === 'suggestions') {
       game.suggestions = (value === '1');
       if (game.mode === 'solo') {
         game.configStep = null;
         saveGameState(threadID).catch(() => {});
-        try {
-          const img = await drawStart('solo', '', '');
-          await sendImage(api, threadID, img);
-        } catch(e) {}
+        try { await sendImage(api, threadID, await drawStart('solo', '', '')); } catch(e) {}
         await plain(api, threadID, t(threadID, 'start_solo'));
         await nextQuestion(api, threadID);
       } else {
-        await next(t(threadID, 'cfg_teamA'), 'teamAName', 'nameA', TIMEOUTS.CONFIG, t(threadID, 'default_teamA'), t(threadID, 'default_teamA'));
+        await proceed(t(threadID, 'cfg_teamA'), 'teamAName', 'nameA', TIMEOUTS.CONFIG, t(threadID, 'default_teamA'), t(threadID, 'default_teamA'));
       }
 
     } else if (step === 'teamAName') {
       game.teamAName = sanitize(value).slice(0, NAME_MAX_LEN) || t(threadID, 'default_teamA');
-      await next(t(threadID, 'cfg_teamB', game.teamAName), 'teamBName', 'nameB', TIMEOUTS.CONFIG, t(threadID, 'default_teamB'), t(threadID, 'default_teamB'));
+      await proceed(t(threadID, 'cfg_teamB', game.teamAName), 'teamBName', 'nameB', TIMEOUTS.CONFIG, t(threadID, 'default_teamB'), t(threadID, 'default_teamB'));
 
     } else if (step === 'teamBName') {
       game.teamBName = sanitize(value).slice(0, NAME_MAX_LEN) || t(threadID, 'default_teamB');
-      await next(t(threadID, 'cfg_size', game.teamBName), 'teamSize', 'size', TIMEOUTS.CHOICE, 'Libre', '2');
+      await proceed(t(threadID, 'cfg_size', game.teamBName), 'teamSize', 'size', TIMEOUTS.CHOICE, 'Libre', '2');
 
     } else if (step === 'teamSize') {
       game.teamSize = (value === '1') ? 'reglo' : 'libre';
@@ -797,7 +740,7 @@ async function runConfig(api, threadID, step, value) {
 }
 
 module.exports = {
-  config: { name: 'quiz', version: '2.4', author: "Octavio & L'Uchiha Perdu", role: 0, category: 'game' },
+  config: { name: 'quiz', version: '2.5', author: "Octavio & L'Uchiha Perdu", role: 0, category: 'game' },
 
   onStart: async function({ api, event, args }) {
     await fetchBotName(api);
@@ -825,9 +768,7 @@ module.exports = {
         let msg = t(threadID, 'rank_title') + '\n\n';
         res.data.forEach((u, i) => { msg += t(threadID, 'rank_line', i + 1, u.name, u.pts) + '\n'; });
         return announce(api, threadID, msg.trim());
-      } catch (_) {
-        return plain(api, threadID, t(threadID, 'rank_err'));
-      }
+      } catch(_) { return plain(api, threadID, t(threadID, 'rank_err')); }
     }
 
     if (cmd === 'profil' || cmd === 'profile') {
@@ -835,21 +776,12 @@ module.exports = {
         const senderName = await getUserName(api, senderID);
         const res = await apiGet(`/user/${senderID}`);
         const u = res.data;
-        return announce(api, threadID,
-          `${t(threadID, 'profile_header', senderName, getRank(u.pts || 0))}\n\n${t(threadID, 'profile_stats', u.pts || 0, u.streak || 0, u.bestStreak || 0)}`
-        );
-      } catch (_) {
-        return plain(api, threadID, t(threadID, 'rank_err'));
-      }
+        return announce(api, threadID, `${t(threadID, 'profile_header', senderName, getRank(u.pts || 0))}\n\n${t(threadID, 'profile_stats', u.pts || 0, u.streak || 0, u.bestStreak || 0)}`);
+      } catch(_) { return plain(api, threadID, t(threadID, 'rank_err')); }
     }
 
-    if (cmd === 'regle' || cmd === 'rules') {
-      return announce(api, threadID, t(threadID, 'rules'));
-    }
-
-    if (cmd === 'credits') {
-      return plain(api, threadID, t(threadID, 'credits'));
-    }
+    if (cmd === 'regle' || cmd === 'rules') return announce(api, threadID, t(threadID, 'rules'));
+    if (cmd === 'credits') return plain(api, threadID, t(threadID, 'credits'));
 
     if (cmd === 'start') {
       const existing = activeGames.get(threadID);
@@ -888,6 +820,12 @@ module.exports = {
     return announce(api, threadID, t(threadID, 'cmd_list'));
   },
 
+  onReply: async function({ api, event, Reply }) {
+    if (!Reply || Reply.type !== 'quiz_answer') return;
+    const { threadID } = Reply;
+    await processAnswer(api, event, threadID, event.senderID);
+  },
+
   handleEvent: async function({ api, event }) {
     const threadID = event.threadID;
     const senderID = event.senderID;
@@ -900,11 +838,8 @@ module.exports = {
       const step = game.configStep;
 
       if (step === 'category') {
-        if (['1','2','3','4','5','6','7','8','9'].includes(body)) {
-          await runConfig(api, threadID, 'category', body);
-        } else if (body) {
-          await plain(api, threadID, t(threadID, 'cfg_hint_category'));
-        }
+        if (['1','2','3','4','5','6','7','8','9'].includes(body)) await runConfig(api, threadID, 'category', body);
+        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_category'));
         return;
       }
       if (step === 'customCategory') {
@@ -912,28 +847,19 @@ module.exports = {
         return;
       }
       if (step === 'difficulty') {
-        if (['1','2','3'].includes(body)) {
-          await runConfig(api, threadID, 'difficulty', body);
-        } else if (body) {
-          await plain(api, threadID, t(threadID, 'cfg_hint_difficulty'));
-        }
+        if (['1','2','3'].includes(body)) await runConfig(api, threadID, 'difficulty', body);
+        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_difficulty'));
         return;
       }
       if (step === 'total') {
         const n = parseInt(body, 10);
-        if (!isNaN(n) && n >= 5 && n <= 50) {
-          await runConfig(api, threadID, 'total', body);
-        } else if (body) {
-          await plain(api, threadID, t(threadID, 'cfg_hint_total'));
-        }
+        if (!isNaN(n) && n >= 5 && n <= 50) await runConfig(api, threadID, 'total', body);
+        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_total'));
         return;
       }
       if (step === 'suggestions') {
-        if (['1','2'].includes(body)) {
-          await runConfig(api, threadID, 'suggestions', body);
-        } else if (body) {
-          await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
-        }
+        if (['1','2'].includes(body)) await runConfig(api, threadID, 'suggestions', body);
+        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
         return;
       }
       if (step === 'teamAName') {
@@ -945,11 +871,8 @@ module.exports = {
         return;
       }
       if (step === 'teamSize') {
-        if (['1','2'].includes(body)) {
-          await runConfig(api, threadID, 'teamSize', body);
-        } else if (body) {
-          await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
-        }
+        if (['1','2'].includes(body)) await runConfig(api, threadID, 'teamSize', body);
+        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
         return;
       }
       return;
@@ -961,7 +884,7 @@ module.exports = {
     }
 
     if (game.messageID && event.messageReply?.messageID === game.messageID) {
-      await handleAnswer(api, event, threadID, senderID);
+      await processAnswer(api, event, threadID, senderID);
     }
   },
 };
