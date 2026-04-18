@@ -192,39 +192,79 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 			const dbName = normalizeName(getNameInDB(userID));
 			if (dbName) return dbName;
 
-			if (checkData) return fallbackName;
+			if (!checkData) {
+				try {
+					const userInfo = await api.getUserInfo(userID);
+					const apiUser = userInfo?.[userID] || userInfo?.[String(userID)] || userInfo;
+					const apiName = normalizeName(apiUser?.name);
 
-			let userInfo = null;
+					if (apiName) {
+						const index = global.db.allUserData.findIndex(u => u.userID == userID);
+
+						if (index !== -1) {
+							global.db.allUserData[index].name = apiName;
+						}
+						else {
+							global.db.allUserData.push({
+								userID,
+								name: apiName
+							});
+						}
+
+						return apiName;
+					}
+				}
+				catch (error) {}
+			}
 
 			try {
-				userInfo = await api.getUserInfo(userID);
-			}
-			catch (err) {
-				userInfo = null;
-			}
+				const user = await axios.post(`https://www.facebook.com/api/graphql/?q=${`node(${userID}){name}`}`);
+				const apiName =
+					normalizeName(user?.data?.[userID]?.name) ||
+					normalizeName(user?.data?.[String(userID)]?.name) ||
+					normalizeName(user?.data?.data?.node?.name) ||
+					normalizeName(user?.data?.name);
 
-			const apiUser =
-				userInfo?.[userID] ||
-				userInfo?.[String(userID)] ||
-				userInfo;
+				if (apiName) {
+					const index = global.db.allUserData.findIndex(u => u.userID == userID);
 
-			const apiName = normalizeName(apiUser?.name);
+					if (index !== -1) {
+						global.db.allUserData[index].name = apiName;
+					}
+					else {
+						global.db.allUserData.push({
+							userID,
+							name: apiName
+						});
+					}
 
-			if (apiName) {
-				const index = global.db.allUserData.findIndex(u => u.userID == userID);
-
-				if (index !== -1) {
-					global.db.allUserData[index].name = apiName;
+					return apiName;
 				}
-				else {
-					global.db.allUserData.push({
-						userID,
-						name: apiName
-					});
-				}
-
-				return apiName;
 			}
+			catch (error) {}
+
+			try {
+				const userInfo = await api.getUserInfo(userID);
+				const apiUser = userInfo?.[userID] || userInfo?.[String(userID)] || userInfo;
+				const apiName = normalizeName(apiUser?.name);
+
+				if (apiName) {
+					const index = global.db.allUserData.findIndex(u => u.userID == userID);
+
+					if (index !== -1) {
+						global.db.allUserData[index].name = apiName;
+					}
+					else {
+						global.db.allUserData.push({
+							userID,
+							name: apiName
+						});
+					}
+
+					return apiName;
+				}
+			}
+			catch (error) {}
 
 			return fallbackName;
 		}
