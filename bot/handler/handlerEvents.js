@@ -1,7 +1,5 @@
 const fs = require("fs-extra");
 const nullAndUndefined = [undefined, null];
-// const { config } = global.GoatBot;
-// const { utils } = global;
 
 function getType(obj) {
         return Object.prototype.toString.call(obj).slice(8, -1);
@@ -28,6 +26,9 @@ function getText(type, reason, time, targetID, lang) {
 }
 
 function replaceShortcutInLang(text, prefix, commandName) {
+        if (typeof text !== "string")
+                return text;
+
         return text
                 .replace(/\{(?:p|prefix)\}/g, prefix)
                 .replace(/\{(?:n|name)\}/g, commandName)
@@ -61,19 +62,12 @@ function getRoleConfig(utils, command, isGroup, threadData, commandName) {
         }
 
         return roleConfig;
-        // {
-        //         onChat,
-        //         onStart,
-        //         onReaction,
-        //         onReply
-        // }
 }
 
 function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, commandName, message, lang) {
         const config = global.GoatBot.config;
         const { adminBot, hideNotiMessage } = config;
 
-        // check if user banned
         const infoBannedUser = userData.banned;
         if (infoBannedUser.status == true) {
                 const { reason, date } = infoBannedUser;
@@ -82,7 +76,6 @@ function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, 
                 return true;
         }
 
-        // check if only admin bot
         if (
                 config.adminOnly.enable == true
                 && !adminBot.includes(senderID)
@@ -93,20 +86,17 @@ function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, 
                 return true;
         }
 
-        // ==========    Check Thread    ========== //
         if (isGroup == true) {
                 if (
                         threadData.data.onlyAdminBox === true
                         && !threadData.adminIDs.includes(senderID)
                         && !(threadData.data.ignoreCommanToOnlyAdminBox || []).includes(commandName)
                 ) {
-                        // check if only admin box
                         if (!threadData.data.hideNotiMessageOnlyAdminBox)
                                 message.reply(getText("onlyAdminBox", null, null, null, lang));
                         return true;
                 }
 
-                // check if thread banned
                 const infoBannedThread = threadData.banned;
                 if (infoBannedThread.status == true) {
                         const { reason, date } = infoBannedThread;
@@ -118,20 +108,30 @@ function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, 
         return false;
 }
 
-
 function createGetText2(langCode, pathCustomLang, prefix, command) {
         const commandType = command.config.countDown ? "command" : "command event";
         const commandName = command.config.name;
         let customLang = {};
         let getText2 = () => { };
+
         if (fs.existsSync(pathCustomLang))
                 customLang = require(pathCustomLang)[commandName]?.text || {};
+
         if (command.langs || customLang || {}) {
                 getText2 = function (key, ...args) {
-                        let lang = command.langs?.[langCode]?.[key] || customLang[key] || "";
+                        let lang = command.langs?.[langCode]?.[key] ?? customLang[key] ?? "";
+
+                        if (Array.isArray(lang))
+                                return lang;
+
+                        if (typeof lang !== "string")
+                                return lang;
+
                         lang = replaceShortcutInLang(lang, prefix, commandName);
+
                         for (let i = args.length - 1; i >= 0; i--)
                                 lang = lang.replace(new RegExp(`%${i + 1}`, "g"), args[i]);
+
                         return lang || `❌ Can't find text on language "${langCode}" for ${commandType} "${commandName}" with key "${key}"`;
                 };
         }
@@ -147,44 +147,29 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                 const { autoRefreshThreadInfoFirstTime } = config.database;
                 let { hideNotiMessage = {} } = config;
 
-const { body, messageID, threadID, isGroup } = event;
+                const { body, messageID, threadID, isGroup } = event;
 
-// ── Mention normalisation ─────────────────────────────────────────────────
-// The FCA library already runs parseMentions() (prng / tags_metadata /
-// profile_xmd) before this handler is called, so event.mentions should
-// always be a plain object { uid: "@Tag", ... } at this point.
-//
-// We only need to handle two edge-cases here — no API calls required:
-//
-//   1. event.mentions is missing entirely  → default to {}
-//   2. event.mentions is an array          → some older lib forks return
-//      [{id, offset, length}]; normalise to the object format so all
-//      commands that use Object.keys(event.mentions) keep working.
-//
-// What we do NOT do here (and why):
-//   ✗ getThreadInfo + getUserInfo  — 2 extra API calls per message, slow
-//   ✗ fuzzy name matching on body  — wrong uid if two users share a name
-//   ✗ single-mention only          — would silently drop the rest
-if (!event.mentions) {
-    event.mentions = {};
-} else if (Array.isArray(event.mentions)) {
-    // Normalise array format → { uid: tagText }
-    const body_ = event.body || "";
-    const normalised = {};
-    for (const m of event.mentions) {
-        if (m && m.id != null) {
-            const tag = (m.offset != null && m.length != null)
-                ? body_.substring(m.offset, m.offset + m.length)
-                : (m.name || m.tag || "");
-            normalised[String(m.id)] = tag;
-        }
-    }
-    event.mentions = normalised;
-}
-// ── End mention normalisation ─────────────────────────────────────────────
-// Check if has threadID
-if (!threadID)
-        return;
+                // ── Mention normalisation ─────────────────────────────────────────────────
+                if (!event.mentions) {
+                        event.mentions = {};
+                }
+                else if (Array.isArray(event.mentions)) {
+                        const body_ = event.body || "";
+                        const normalised = {};
+                        for (const m of event.mentions) {
+                                if (m && m.id != null) {
+                                        const tag = (m.offset != null && m.length != null)
+                                                ? body_.substring(m.offset, m.offset + m.length)
+                                                : (m.name || m.tag || "");
+                                        normalised[String(m.id)] = tag;
+                                }
+                        }
+                        event.mentions = normalised;
+                }
+                // ── End mention normalisation ─────────────────────────────────────────────
+
+                if (!threadID)
+                        return;
 
                 const senderID = event.userID || event.senderID || event.author;
 
@@ -238,22 +223,17 @@ if (!threadID)
                         };
                 }
 
-                /*
-                        +-----------------------------------------------+
-                        |                                                         WHEN CALL COMMAND                                                                |
-                        +-----------------------------------------------+
-                */
                 let isUserCallCommand = false;
+
                 async function onStart() {
-                        // —————————————— CHECK USE BOT —————————————— //
                         if (!body || !body.startsWith(prefix))
                                 return;
+
                         const dateNow = Date.now();
                         const args = body.slice(prefix.length).trim().split(/ +/);
-                        // ————————————  CHECK HAS COMMAND ——————————— //
                         let commandName = args.shift().toLowerCase();
                         let command = GoatBot.commands.get(commandName) || GoatBot.commands.get(GoatBot.aliases.get(commandName));
-                        // ———————— CHECK ALIASES SET BY GROUP ———————— //
+
                         const aliasesData = threadData.data.aliases || {};
                         for (const cmdName in aliasesData) {
                                 if (aliasesData[cmdName].includes(commandName)) {
@@ -261,10 +241,10 @@ if (!threadID)
                                         break;
                                 }
                         }
-                        // ————————————— SET COMMAND NAME ————————————— //
+
                         if (command)
                                 commandName = command.config.name;
-                        // ——————— FUNCTION REMOVE COMMAND NAME ———————— //
+
                         function removeCommandNameFromBody(body_, prefix_, commandName_) {
                                 if (arguments.length) {
                                         if (typeof body_ != "string")
@@ -280,9 +260,10 @@ if (!threadID)
                                         return body.replace(new RegExp(`^${prefix}(\\s+|)${commandName}`, "i"), "").trim();
                                 }
                         }
-                        // —————  CHECK BANNED OR ONLY ADMIN BOX  ————— //
+
                         if (isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, commandName, message, langCode))
                                 return;
+
                         if (!command)
                                 if (!hideNotiMessage.commandNotFound)
                                         return await message.reply(
@@ -292,7 +273,7 @@ if (!threadID)
                                         );
                                 else
                                         return true;
-                        // ————————————— CHECK PERMISSION ———————————— //
+
                         const roleConfig = getRoleConfig(utils, command, isGroup, threadData, commandName);
                         const needRole = roleConfig.onStart;
 
@@ -307,7 +288,7 @@ if (!threadID)
                                         return true;
                                 }
                         }
-                        // ———————————————— countDown ———————————————— //
+
                         if (!client.countDown[commandName])
                                 client.countDown[commandName] = {};
                         const timestamps = client.countDown[commandName];
@@ -320,11 +301,10 @@ if (!threadID)
                                 if (dateNow < expirationTime)
                                         return await message.reply(utils.getText({ lang: langCode, head: "handlerEvents" }, "waitingForCommand", ((expirationTime - dateNow) / 1000).toString().slice(0, 3)));
                         }
-                        // ——————————————— RUN COMMAND ——————————————— //
+
                         const time = getTime("DD/MM/YYYY HH:mm:ss");
                         isUserCallCommand = true;
                         try {
-                                // analytics command call
                                 (async () => {
                                         const analytics = await globalData.get("analytics", "data", {});
                                         if (!analytics[commandName])
@@ -351,12 +331,6 @@ if (!threadID)
                         }
                 }
 
-
-                /*
-                 +------------------------------------------------+
-                 |                    ON CHAT                     |
-                 +------------------------------------------------+
-                */
                 async function onChat() {
                         const allOnChat = GoatBot.onChat || [];
                         const args = body ? body.split(/ +/) : [];
@@ -366,7 +340,6 @@ if (!threadID)
                                         continue;
                                 const commandName = command.config.name;
 
-                                // —————————————— CHECK PERMISSION —————————————— //
                                 const roleConfig = getRoleConfig(utils, command, isGroup, threadData, commandName);
                                 const needRole = roleConfig.onChat;
                                 if (needRole > role)
@@ -378,7 +351,6 @@ if (!threadID)
 
                                 if (getType(command.onChat) == "Function") {
                                         const defaultOnChat = command.onChat;
-                                        // convert to AsyncFunction
                                         command.onChat = async function () {
                                                 return defaultOnChat(...arguments);
                                         };
@@ -410,12 +382,6 @@ if (!threadID)
                         }
                 }
 
-
-                /*
-                 +------------------------------------------------+
-                 |                   ON ANY EVENT                 |
-                 +------------------------------------------------+
-                */
                 async function onAnyEvent() {
                         const allOnAnyEvent = GoatBot.onAnyEvent || [];
                         let args = [];
@@ -436,7 +402,6 @@ if (!threadID)
 
                                 if (getType(command.onAnyEvent) == "Function") {
                                         const defaultOnAnyEvent = command.onAnyEvent;
-                                        // convert to AsyncFunction
                                         command.onAnyEvent = async function () {
                                                 return defaultOnAnyEvent(...arguments);
                                         };
@@ -466,11 +431,6 @@ if (!threadID)
                         }
                 }
 
-                /*
-                 +------------------------------------------------+
-                 |                  ON FIRST CHAT                 |
-                 +------------------------------------------------+
-                */
                 async function onFirstChat() {
                         const allOnFirstChat = GoatBot.onFirstChat || [];
                         const args = body ? body.split(/ +/) : [];
@@ -490,7 +450,6 @@ if (!threadID)
 
                                 if (getType(command.onFirstChat) == "Function") {
                                         const defaultOnFirstChat = command.onFirstChat;
-                                        // convert to AsyncFunction
                                         command.onFirstChat = async function () {
                                                 return defaultOnFirstChat(...arguments);
                                         };
@@ -522,12 +481,6 @@ if (!threadID)
                         }
                 }
 
-
-                /* 
-                 +------------------------------------------------+
-                 |                    ON REPLY                    |
-                 +------------------------------------------------+
-                */
                 async function onReply() {
                         if (!event.messageReply)
                                 return;
@@ -547,7 +500,6 @@ if (!threadID)
                                 return log.err("onReply", `Command "${commandName}" not found`, Reply);
                         }
 
-                        // —————————————— CHECK PERMISSION —————————————— //
                         const roleConfig = getRoleConfig(utils, command, isGroup, threadData, commandName);
                         const needRole = roleConfig.onReply;
                         if (needRole > role) {
@@ -586,12 +538,6 @@ if (!threadID)
                         }
                 }
 
-
-                /*
-                 +------------------------------------------------+
-                 |                   ON REACTION                  |
-                 +------------------------------------------------+
-                */
                 async function onReaction() {
                         const { onReaction } = GoatBot;
                         const Reaction = onReaction.get(messageID);
@@ -609,7 +555,6 @@ if (!threadID)
                                 return log.err("onReaction", `Command "${commandName}" not found`, Reaction);
                         }
 
-                        // —————————————— CHECK PERMISSION —————————————— //
                         const roleConfig = getRoleConfig(utils, command, isGroup, threadData, commandName);
                         const needRole = roleConfig.onReaction;
                         if (needRole > role) {
@@ -623,7 +568,6 @@ if (!threadID)
                                         return true;
                                 }
                         }
-                        // —————————————————————————————————————————————— //
 
                         const time = getTime("DD/MM/YYYY HH:mm:ss");
                         try {
@@ -649,12 +593,6 @@ if (!threadID)
                         }
                 }
 
-
-                /*
-                 +------------------------------------------------+
-                 |                 EVENT COMMAND                  |
-                 +------------------------------------------------+
-                */
                 async function handlerEvent() {
                         const { author } = event;
                         const allEventCommand = GoatBot.eventCommands.entries();
@@ -683,12 +621,6 @@ if (!threadID)
                         }
                 }
 
-
-                /*
-                 +------------------------------------------------+
-                 |                    ON EVENT                    |
-                 +------------------------------------------------+
-                */
                 async function onEvent() {
                         const allOnEvent = GoatBot.onEvent || [];
                         const args = [];
@@ -707,7 +639,6 @@ if (!threadID)
 
                                 if (getType(command.onEvent) == "Function") {
                                         const defaultOnEvent = command.onEvent;
-                                        // convert to AsyncFunction
                                         command.onEvent = async function () {
                                                 return defaultOnEvent(...arguments);
                                         };
@@ -737,29 +668,14 @@ if (!threadID)
                         }
                 }
 
-                /*
-                 +------------------------------------------------+
-                 |                    PRESENCE                    |
-                 +------------------------------------------------+
-                */
                 async function presence() {
                         // Your code here
                 }
 
-                /*
-                 +------------------------------------------------+
-                 |                  READ RECEIPT                  |
-                 +------------------------------------------------+
-                */
                 async function read_receipt() {
                         // Your code here
                 }
 
-                /*
-                 +------------------------------------------------+
-                 |                                    TYP                            |
-                 +------------------------------------------------+
-                */
                 async function typ() {
                         // Your code here
                 }
