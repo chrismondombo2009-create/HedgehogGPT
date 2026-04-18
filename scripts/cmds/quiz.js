@@ -156,9 +156,7 @@ function normalize(str) {
   return str.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function getLang(tid) {
-  return langSettings.get(tid) || 'fr';
-}
+function getLang(tid) { return langSettings.get(tid) || 'fr'; }
 
 function t(tid, key, ...args) {
   const lang = getLang(tid);
@@ -173,17 +171,11 @@ function getRank(pts) {
 }
 
 function regReply(msgID, data) {
-  try {
-    if (global.GoatBot?.onReply) {
-      global.GoatBot.onReply.set(msgID, { commandName: 'quiz', ...data });
-    }
-  } catch(e) {}
+  try { global.GoatBot.onReply.set(msgID, { commandName: 'quiz', ...data }); } catch(e) {}
 }
 
 function unregReply(msgID) {
-  try {
-    if (msgID && global.GoatBot?.onReply) global.GoatBot.onReply.delete(msgID);
-  } catch(e) {}
+  try { if (msgID) global.GoatBot.onReply.delete(msgID); } catch(e) {}
 }
 
 let botName = 'QuizBot';
@@ -390,7 +382,8 @@ async function nextQuestion(api, threadID) {
   if (!game || !game.active || game.questionLock) return;
   game.questionLock = true;
 
-  if (game.messageID) { unregReply(game.messageID); game.messageID = null; }
+  unregReply(game.messageID);
+  game.messageID = null;
   if (game.timer) { clearTimeout(game.timer); game.timer = null; }
 
   try {
@@ -411,7 +404,7 @@ async function nextQuestion(api, threadID) {
     if (!activeGames.get(threadID)?.active) return;
 
     const q = res.data;
-    if (!q?.question || !q?.answer) throw new Error('Reponse API invalide');
+    if (!q?.question || !q?.answer) throw new Error('API invalide');
 
     game.currentQuestion = sanitize(q.question);
     game.answer = normalize(sanitize(q.answer));
@@ -509,92 +502,6 @@ async function endGame(api, threadID) {
   activeGames.delete(threadID);
 }
 
-async function processAnswer(api, event, threadID, senderID) {
-  const game = activeGames.get(threadID);
-  if (!game || !game.active || game.questionLock) return;
-
-  if (game.mode === 'team') {
-    if (!game.teamA.includes(senderID) && !game.teamB.includes(senderID)) return;
-  }
-
-  if (!game.attemptedThisQuestion) game.attemptedThisQuestion = new Set();
-  if (game.attemptedThisQuestion.has(senderID)) return;
-  game.attemptedThisQuestion.add(senderID);
-  game.questionLock = true;
-
-  if (game.timer) { clearTimeout(game.timer); game.timer = null; }
-  unregReply(game.messageID);
-
-  try {
-    const senderName = await getUserName(api, senderID);
-    const userAnswer = normalize(sanitize(event.body));
-    let correct = false;
-
-    if (game.suggestionsList) {
-      const idx = ['a', 'b', 'c', 'd'].indexOf(userAnswer);
-      if (idx !== -1 && game.suggestionsList[idx] !== undefined) {
-        correct = normalize(game.suggestionsList[idx]) === game.answer;
-      }
-    } else {
-      try {
-        const res = await apiPost('/quiz/validate', {
-          question: game.currentQuestion, expected: game.answer, userAnswer, threadId: threadID,
-        });
-        correct = !!res.data?.correct;
-      } catch(_) { correct = userAnswer === game.answer; }
-    }
-
-    if (correct) {
-      const pts = 10;
-      game.scores[senderID] = (game.scores[senderID] || 0) + pts;
-      game.sessionCorrect[senderID] = (game.sessionCorrect[senderID] || 0) + 1;
-      if (game.mode === 'team') {
-        if (game.teamA.includes(senderID)) game.teamAScore += pts;
-        else if (game.teamB.includes(senderID)) game.teamBScore += pts;
-      }
-      apiPost('/user/update', {
-        id: senderID, name: senderName, addPts: pts, addCoins: 5, streakChange: 1, loseChange: 0,
-      }).catch(() => {});
-      if (game.mode === 'team') {
-        const table = await buildTeamTable(api, threadID);
-        await api.sendMessage({ body: table }, threadID);
-      } else {
-        await plain(api, threadID, t(threadID, 'correct_solo_rank', senderName, pts, game.scores[senderID], getRank(game.scores[senderID])));
-      }
-      game.questionLock = false;
-      await nextQuestion(api, threadID);
-
-    } else {
-      await api.setMessageReaction('❌', event.messageID, () => {}).catch(() => {});
-      apiPost('/user/update', {
-        id: senderID, name: senderName, addPts: 0, addCoins: 0, streakChange: 0, loseChange: 1,
-      }).catch(() => {});
-      const remaining = game.timerEnd - Date.now();
-      const capturedMsgID = game.messageID;
-      if (remaining > 0) {
-        game.timer = setTimeout(async () => {
-          const g = activeGames.get(threadID);
-          if (!g || !g.active || g.messageID !== capturedMsgID || g.questionLock) return;
-          g.questionLock = true;
-          g.messageID = null;
-          try { await plain(api, threadID, t(threadID, 'timeout', g.answer)); } catch(e) {}
-          g.questionLock = false;
-          await nextQuestion(api, threadID);
-        }, remaining);
-        game.questionLock = false;
-      } else {
-        game.questionLock = false;
-        await plain(api, threadID, t(threadID, 'timeout', game.answer)).catch(() => {});
-        await nextQuestion(api, threadID);
-      }
-      saveGameState(threadID).catch(() => {});
-    }
-  } catch(err) {
-    console.error('[processAnswer]', err.message);
-    game.questionLock = false;
-  }
-}
-
 async function handleJoin(api, threadID, senderID) {
   const game = activeGames.get(threadID);
   if (!game || !game.active || game.mode !== 'team' || !game.joinPhase) return false;
@@ -659,6 +566,36 @@ async function startTeamQuiz(api, threadID) {
   await nextQuestion(api, threadID);
 }
 
+async function dispatchConfigInput(api, threadID, step, body) {
+  const game = activeGames.get(threadID);
+  if (!game || !game.active || game.configLock) return;
+  if (!body) return;
+
+  if (step === 'category') {
+    if (['1','2','3','4','5','6','7','8','9'].includes(body)) await runConfig(api, threadID, 'category', body);
+    else await plain(api, threadID, t(threadID, 'cfg_hint_category'));
+  } else if (step === 'customCategory') {
+    await runConfig(api, threadID, 'customCategory', body);
+  } else if (step === 'difficulty') {
+    if (['1','2','3'].includes(body)) await runConfig(api, threadID, 'difficulty', body);
+    else await plain(api, threadID, t(threadID, 'cfg_hint_difficulty'));
+  } else if (step === 'total') {
+    const n = parseInt(body, 10);
+    if (!isNaN(n) && n >= 5 && n <= 50) await runConfig(api, threadID, 'total', body);
+    else await plain(api, threadID, t(threadID, 'cfg_hint_total'));
+  } else if (step === 'suggestions') {
+    if (['1','2'].includes(body)) await runConfig(api, threadID, 'suggestions', body);
+    else await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
+  } else if (step === 'teamAName') {
+    await runConfig(api, threadID, 'teamAName', body);
+  } else if (step === 'teamBName') {
+    await runConfig(api, threadID, 'teamBName', body);
+  } else if (step === 'teamSize') {
+    if (['1','2'].includes(body)) await runConfig(api, threadID, 'teamSize', body);
+    else await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
+  }
+}
+
 async function runConfig(api, threadID, step, value) {
   const game = activeGames.get(threadID);
   if (!game || !game.active || game.configLock) return;
@@ -666,13 +603,17 @@ async function runConfig(api, threadID, step, value) {
 
   try {
     clearAllTimeouts(game);
+    unregReply(game.messageID);
 
     const proceed = async (msg, nextStep, schedKey, schedMs, schedDefault, schedValue) => {
       game.configStep = nextStep;
-      await plain(api, threadID, msg);
+      const sent = await plain(api, threadID, msg);
+      game.messageID = sent.messageID;
+      regReply(sent.messageID, { type: 'quiz_config', threadID, step: nextStep, ownerID: game.ownerID });
       game.choiceTimeouts[schedKey] = setTimeout(async () => {
         const g = activeGames.get(threadID);
         if (!g?.active || g.configLock) return;
+        unregReply(g.messageID);
         await plain(api, threadID, t(threadID, 'cfg_timeout_default', schedDefault)).catch(() => {});
         if (!activeGames.get(threadID)?.active) return;
         await runConfig(api, threadID, nextStep, schedValue);
@@ -707,8 +648,9 @@ async function runConfig(api, threadID, step, value) {
 
     } else if (step === 'suggestions') {
       game.suggestions = (value === '1');
+      game.configStep = null;
+      game.messageID = null;
       if (game.mode === 'solo') {
-        game.configStep = null;
         saveGameState(threadID).catch(() => {});
         try { await sendImage(api, threadID, await drawStart('solo', '', '')); } catch(e) {}
         await plain(api, threadID, t(threadID, 'start_solo'));
@@ -728,6 +670,7 @@ async function runConfig(api, threadID, step, value) {
     } else if (step === 'teamSize') {
       game.teamSize = (value === '1') ? 'reglo' : 'libre';
       game.configStep = null;
+      game.messageID = null;
       game.joinPhase = 'A';
       await plain(api, threadID, t(threadID, 'cfg_teamA_go', game.teamAName, TIMEOUTS.JOIN / 1000));
       game.joinTimeout = setTimeout(() => finishTeamCreation(api, threadID), TIMEOUTS.JOIN);
@@ -739,8 +682,85 @@ async function runConfig(api, threadID, step, value) {
   }
 }
 
+async function processAnswer(api, event, threadID, senderID) {
+  const game = activeGames.get(threadID);
+  if (!game || !game.active || game.questionLock) return;
+  if (game.mode === 'team' && !game.teamA.includes(senderID) && !game.teamB.includes(senderID)) return;
+  if (!game.attemptedThisQuestion) game.attemptedThisQuestion = new Set();
+  if (game.attemptedThisQuestion.has(senderID)) return;
+  game.attemptedThisQuestion.add(senderID);
+  game.questionLock = true;
+
+  if (game.timer) { clearTimeout(game.timer); game.timer = null; }
+  unregReply(game.messageID);
+  game.messageID = null;
+
+  try {
+    const senderName = await getUserName(api, senderID);
+    const userAnswer = normalize(sanitize(event.body));
+    let correct = false;
+
+    if (game.suggestionsList) {
+      const idx = ['a', 'b', 'c', 'd'].indexOf(userAnswer);
+      if (idx !== -1 && game.suggestionsList[idx] !== undefined) {
+        correct = normalize(game.suggestionsList[idx]) === game.answer;
+      }
+    } else {
+      try {
+        const res = await apiPost('/quiz/validate', {
+          question: game.currentQuestion, expected: game.answer, userAnswer, threadId: threadID,
+        });
+        correct = !!res.data?.correct;
+      } catch(_) { correct = userAnswer === game.answer; }
+    }
+
+    if (correct) {
+      const pts = 10;
+      game.scores[senderID] = (game.scores[senderID] || 0) + pts;
+      game.sessionCorrect[senderID] = (game.sessionCorrect[senderID] || 0) + 1;
+      if (game.mode === 'team') {
+        if (game.teamA.includes(senderID)) game.teamAScore += pts;
+        else if (game.teamB.includes(senderID)) game.teamBScore += pts;
+      }
+      apiPost('/user/update', { id: senderID, name: senderName, addPts: pts, addCoins: 5, streakChange: 1, loseChange: 0 }).catch(() => {});
+      if (game.mode === 'team') {
+        await api.sendMessage({ body: await buildTeamTable(api, threadID) }, threadID);
+      } else {
+        await plain(api, threadID, t(threadID, 'correct_solo_rank', senderName, pts, game.scores[senderID], getRank(game.scores[senderID])));
+      }
+      game.questionLock = false;
+      await nextQuestion(api, threadID);
+
+    } else {
+      await api.setMessageReaction('❌', event.messageID, () => {}).catch(() => {});
+      apiPost('/user/update', { id: senderID, name: senderName, addPts: 0, addCoins: 0, streakChange: 0, loseChange: 1 }).catch(() => {});
+      const remaining = game.timerEnd - Date.now();
+      if (remaining > 0) {
+        const capturedAnswer = game.answer;
+        game.timer = setTimeout(async () => {
+          const g = activeGames.get(threadID);
+          if (!g || !g.active || g.questionLock) return;
+          g.questionLock = true;
+          try { await plain(api, threadID, t(threadID, 'timeout', capturedAnswer)); } catch(e) {}
+          g.questionLock = false;
+          await nextQuestion(api, threadID);
+        }, remaining);
+        game.questionLock = false;
+      } else {
+        game.questionLock = false;
+        await plain(api, threadID, t(threadID, 'timeout', game.answer)).catch(() => {});
+        await nextQuestion(api, threadID);
+      }
+      saveGameState(threadID).catch(() => {});
+    }
+  } catch(err) {
+    console.error('[processAnswer]', err.message);
+    game.questionLock = false;
+  }
+}
+
 module.exports = {
-  config: { name: 'quiz', version: '2.5', author: "Octavio & L'Uchiha Perdu", role: 0, category: 'game' },
+  config: { name: 'quiz', version: '2.6', author: "Octavio & L'Uchiha Perdu", role: 0, category: 'game' },
 
   onStart: async function({ api, event, args }) {
     await fetchBotName(api);
@@ -796,11 +816,14 @@ module.exports = {
       game.configStep = 'category';
       activeGames.set(threadID, game);
 
-      await plain(api, threadID, t(threadID, 'cfg_cat'));
+      const sent = await plain(api, threadID, t(threadID, 'cfg_cat'));
+      game.messageID = sent.messageID;
+      regReply(sent.messageID, { type: 'quiz_config', threadID, step: 'category', ownerID: senderID });
 
       game.choiceTimeouts.cat = setTimeout(async () => {
         const g = activeGames.get(threadID);
         if (!g?.active || g.configLock) return;
+        unregReply(g.messageID);
         await plain(api, threadID, t(threadID, 'cfg_timeout_default', t(threadID, 'default_cat'))).catch(() => {});
         if (!activeGames.get(threadID)?.active) return;
         await runConfig(api, threadID, 'category', '1');
@@ -821,9 +844,24 @@ module.exports = {
   },
 
   onReply: async function({ api, event, Reply }) {
-    if (!Reply || Reply.type !== 'quiz_answer') return;
-    const { threadID } = Reply;
-    await processAnswer(api, event, threadID, event.senderID);
+    if (!Reply) return;
+    const { type, threadID } = Reply;
+    const game = activeGames.get(threadID);
+    if (!game || !game.active) return;
+
+    if (type === 'quiz_answer') {
+      await processAnswer(api, event, threadID, event.senderID);
+      return;
+    }
+
+    if (type === 'quiz_config') {
+      const { step, ownerID } = Reply;
+      if (event.senderID !== ownerID) return;
+      if (game.configStep !== step) return;
+      const body = (event.body || '').trim();
+      await dispatchConfigInput(api, threadID, step, body);
+      return;
+    }
   },
 
   handleEvent: async function({ api, event }) {
@@ -831,60 +869,16 @@ module.exports = {
     const senderID = event.senderID;
     const game = activeGames.get(threadID);
     if (!game || !game.active) return;
-
     const body = (event.body || '').trim();
+    if (!body) return;
 
     if (game.configStep && senderID === game.ownerID && !game.configLock) {
-      const step = game.configStep;
-
-      if (step === 'category') {
-        if (['1','2','3','4','5','6','7','8','9'].includes(body)) await runConfig(api, threadID, 'category', body);
-        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_category'));
-        return;
-      }
-      if (step === 'customCategory') {
-        if (body) await runConfig(api, threadID, 'customCategory', body);
-        return;
-      }
-      if (step === 'difficulty') {
-        if (['1','2','3'].includes(body)) await runConfig(api, threadID, 'difficulty', body);
-        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_difficulty'));
-        return;
-      }
-      if (step === 'total') {
-        const n = parseInt(body, 10);
-        if (!isNaN(n) && n >= 5 && n <= 50) await runConfig(api, threadID, 'total', body);
-        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_total'));
-        return;
-      }
-      if (step === 'suggestions') {
-        if (['1','2'].includes(body)) await runConfig(api, threadID, 'suggestions', body);
-        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
-        return;
-      }
-      if (step === 'teamAName') {
-        if (body) await runConfig(api, threadID, 'teamAName', body);
-        return;
-      }
-      if (step === 'teamBName') {
-        if (body) await runConfig(api, threadID, 'teamBName', body);
-        return;
-      }
-      if (step === 'teamSize') {
-        if (['1','2'].includes(body)) await runConfig(api, threadID, 'teamSize', body);
-        else if (body) await plain(api, threadID, t(threadID, 'cfg_hint_choice'));
-        return;
-      }
+      await dispatchConfigInput(api, threadID, game.configStep, body);
       return;
     }
 
     if (body.toLowerCase() === 'join' && game.mode === 'team' && (game.joinPhase === 'A' || game.joinPhase === 'B')) {
       await handleJoin(api, threadID, senderID);
-      return;
-    }
-
-    if (game.messageID && event.messageReply?.messageID === game.messageID) {
-      await processAnswer(api, event, threadID, senderID);
     }
   },
 };
