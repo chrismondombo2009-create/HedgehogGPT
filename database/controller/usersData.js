@@ -35,7 +35,6 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 
 	switch (databaseType) {
 		case "mongodb": {
-			// delete keys '_id' and '__v' in all users
 			Users = (await userModel.find({}).lean()).map(user => _.omit(user, ["_id", "__v"]));
 			break;
 		}
@@ -67,7 +66,6 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 					});
 				}
 			}
-
 
 			switch (mode) {
 				case "create": {
@@ -106,15 +104,15 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 							_.set(dataWillChange, p, userData[index]);
 						});
 					}
-					else
-						if (path && typeof path === "string" || Array.isArray(path)) {
-							const key = Array.isArray(path) ? path[0] : path.split(".")[0];
-							dataWillChange[key] = oldUserData[key];
-							_.set(dataWillChange, path, userData);
-						}
-						else
-							for (const key in userData)
-								dataWillChange[key] = userData[key];
+					else if (path && typeof path === "string" || Array.isArray(path)) {
+						const key = Array.isArray(path) ? path[0] : path.split(".")[0];
+						dataWillChange[key] = oldUserData[key];
+						_.set(dataWillChange, path, userData);
+					}
+					else {
+						for (const key in userData)
+							dataWillChange[key] = userData[key];
+					}
 
 					switch (databaseType) {
 						case "mongodb": {
@@ -173,8 +171,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 		const userData = global.db.allUserData.find(u => u.userID == userID);
 		if (userData)
 			return userData.name;
-		else
-			return null;
+		return null;
 	}
 
 	async function getName(userID, checkData = true) {
@@ -185,62 +182,101 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 			});
 		}
 
-		if (checkData)
-			return getNameInDB(userID);
+		const fallbackName = "Quelqu'un";
+
+		const normalizeName = (value) => {
+			return (typeof value === "string" && value.trim()) ? value.trim() : null;
+		};
 
 		try {
-			const user = await axios.post(`https://www.facebook.com/api/graphql/?q=${`node(${userID}){name}`}`);
-			return user.data[userID].name;
+			const dbName = normalizeName(getNameInDB(userID));
+			if (dbName) return dbName;
+
+			if (checkData) return fallbackName;
+
+			let userInfo = null;
+
+			try {
+				userInfo = await api.getUserInfo(userID);
+			}
+			catch (err) {
+				userInfo = null;
+			}
+
+			const apiUser =
+				userInfo?.[userID] ||
+				userInfo?.[String(userID)] ||
+				userInfo;
+
+			const apiName = normalizeName(apiUser?.name);
+
+			if (apiName) {
+				const index = global.db.allUserData.findIndex(u => u.userID == userID);
+
+				if (index !== -1) {
+					global.db.allUserData[index].name = apiName;
+				}
+				else {
+					global.db.allUserData.push({
+						userID,
+						name: apiName
+					});
+				}
+
+				return apiName;
+			}
+
+			return fallbackName;
 		}
 		catch (error) {
-			return getNameInDB(userID);
+			console.error("getName error:", error);
+			return fallbackName;
 		}
 	}
 
-async function getAvatarUrl(userID) {
-  if (isNaN(userID)) {
-    throw new CustomError({
-      name: "INVALID_USER_ID",
-      message: `The first argument (userID) must be a number, not ${typeof userID}`
-    });
-  }
-  
-  try {
-    const userInfo = await api.getUserInfo([userID]);
-    if (userInfo[userID]?.thumbSrc) {
-      return userInfo[userID].thumbSrc;
-    }
-  } catch (error) {}
-  
-  try {
-    const user = await axios.post(`https://www.facebook.com/api/graphql/`, null, {
-      params: {
-        doc_id: "5341536295888250",
-        variables: JSON.stringify({ height: 500, scale: 1, userID, width: 500 })
-      }
-    });
-    if (user.data?.data?.profile?.profile_picture?.uri) {
-      return user.data.data.profile.profile_picture.uri;
-    }
-  } catch (error) {}
-  
-  try {
-    if (api && typeof api.getAvatarUser === 'function') {
-      return new Promise((resolve, reject) => {
-        api.getAvatarUser(userID, [500, 500], (err, data) => {
-          if (err || !data || !data[userID]) {
-            reject(err);
-          } else {
-            resolve(data[userID]);
-          }
-        });
-      });
-    }
-  } catch (error) {}
-  
-  return "https://i.ibb.co/bBSpr5v/143086968-2856368904622192-1959732218791162458-n.png";
-}
-	
+	async function getAvatarUrl(userID) {
+		if (isNaN(userID)) {
+			throw new CustomError({
+				name: "INVALID_USER_ID",
+				message: `The first argument (userID) must be a number, not ${typeof userID}`
+			});
+		}
+		
+		try {
+			const userInfo = await api.getUserInfo([userID]);
+			if (userInfo[userID]?.thumbSrc) {
+				return userInfo[userID].thumbSrc;
+			}
+		} catch (error) {}
+		
+		try {
+			const user = await axios.post(`https://www.facebook.com/api/graphql/`, null, {
+				params: {
+					doc_id: "5341536295888250",
+					variables: JSON.stringify({ height: 500, scale: 1, userID, width: 500 })
+				}
+			});
+			if (user.data?.data?.profile?.profile_picture?.uri) {
+				return user.data.data.profile.profile_picture.uri;
+			}
+		} catch (error) {}
+		
+		try {
+			if (api && typeof api.getAvatarUser === 'function') {
+				return new Promise((resolve, reject) => {
+					api.getAvatarUser(userID, [500, 500], (err, data) => {
+						if (err || !data || !data[userID]) {
+							reject(err);
+						} else {
+							resolve(data[userID]);
+						}
+					});
+				});
+			}
+		} catch (error) {}
+		
+		return "https://i.ibb.co/bBSpr5v/143086968-2856368904622192-1959732218791162458-n.png";
+	}
 
 	async function create_(userID, userInfo) {
 		const findInCreatingData = creatingUserData.find(u => u.userID == userID);
@@ -297,7 +333,6 @@ async function getAvatarUrl(userID) {
 			});
 		});
 	}
-
 
 	async function refreshInfo(userID, updateInfoUser) {
 		return new Promise(async function (resolve, reject) {
@@ -389,7 +424,6 @@ async function getAvatarUrl(userID) {
 					name: "INVALID_QUERY",
 					message: `The fourth argument (query) must be a string, not ${typeof query}`
 				});
-
 			else
 				userData = fakeGraphql(query, userData);
 
