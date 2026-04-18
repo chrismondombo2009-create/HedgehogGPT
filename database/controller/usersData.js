@@ -49,6 +49,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 			break;
 		}
 	}
+
 	global.db.allUserData = Users;
 
 	async function save(userID, userData, mode, path) {
@@ -73,9 +74,9 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 						case "mongodb":
 						case "sqlite": {
 							let dataCreated = await userModel.create(userData);
-							dataCreated = databaseType === "mongodb" ?
-								_.omit(dataCreated._doc, ["_id", "__v"]) :
-								dataCreated.get({ plain: true });
+							dataCreated = databaseType === "mongodb"
+								? _.omit(dataCreated._doc, ["_id", "__v"])
+								: dataCreated.get({ plain: true });
 							global.db.allUserData.push(dataCreated);
 							return _.cloneDeep(dataCreated);
 						}
@@ -87,9 +88,8 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 							writeJsonSync(pathUsersData, global.db.allUserData, optionsWriteJSON);
 							return _.cloneDeep(userData);
 						}
-						default: {
+						default:
 							break;
-						}
 					}
 					break;
 				}
@@ -104,7 +104,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 							_.set(dataWillChange, p, userData[index]);
 						});
 					}
-					else if (path && typeof path === "string" || Array.isArray(path)) {
+					else if (path && typeof path == "string" || Array.isArray(path)) {
 						const key = Array.isArray(path) ? path[0] : path.split(".")[0];
 						dataWillChange[key] = oldUserData[key];
 						_.set(dataWillChange, path, userData);
@@ -116,7 +116,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 
 					switch (databaseType) {
 						case "mongodb": {
-							let dataUpdated = await userModel.findOneAndUpdate({ userID }, dataWillChange, { returnDocument: 'after' });
+							let dataUpdated = await userModel.findOneAndUpdate({ userID }, dataWillChange, { returnDocument: "after" });
 							dataUpdated = _.omit(dataUpdated._doc, ["_id", "__v"]);
 							global.db.allUserData[index] = dataUpdated;
 							return _.cloneDeep(dataUpdated);
@@ -156,9 +156,8 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 					}
 					break;
 				}
-				default: {
+				default:
 					break;
-				}
 			}
 			return null;
 		}
@@ -169,8 +168,110 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 
 	function getNameInDB(userID) {
 		const userData = global.db.allUserData.find(u => u.userID == userID);
-		if (userData)
-			return userData.name;
+		if (userData && typeof userData.name === "string" && userData.name.trim())
+			return userData.name.trim();
+		return null;
+	}
+
+	function extractUserInfo(userID, userInfo) {
+		if (!userInfo || typeof userInfo !== "object")
+			return null;
+
+		const info =
+			userInfo[userID] ??
+			userInfo[String(userID)] ??
+			userInfo.data?.[userID] ??
+			userInfo.data?.[String(userID)] ??
+			userInfo.profile ??
+			userInfo;
+
+		if (!info || typeof info !== "object")
+			return null;
+
+		return info;
+	}
+
+	async function syncNameToDB(userID, userInfo) {
+		const info = extractUserInfo(userID, userInfo);
+		if (!info)
+			return null;
+
+		const name = typeof info.name === "string" && info.name.trim() ? info.name.trim() : null;
+		if (!name)
+			return null;
+
+		const index = global.db.allUserData.findIndex(u => u.userID == userID);
+
+		if (index === -1) {
+			try {
+				await create_(userID, info);
+			}
+			catch (err) {
+				// ignore
+			}
+		}
+		else {
+			const updateData = { name };
+
+			if (info.gender !== undefined)
+				updateData.gender = info.gender;
+
+			if (info.vanity !== undefined)
+				updateData.vanity = info.vanity;
+
+			try {
+				await save(userID, updateData, "update");
+			}
+			catch (err) {
+				// ignore
+			}
+		}
+
+		return name;
+	}
+
+	async function fetchRemoteName(userID) {
+		try {
+			const userInfo = await api.getUserInfo(userID);
+			const name = await syncNameToDB(userID, userInfo);
+			if (name)
+				return name;
+		}
+		catch (error) {
+			// ignore and try fallback below
+		}
+
+		try {
+			const user = await axios.post(`https://www.facebook.com/api/graphql/?q=${`node(${userID}){name}`}`);
+			const apiName = user?.data?.[userID]?.name;
+			if (typeof apiName === "string" && apiName.trim()) {
+				const index = global.db.allUserData.findIndex(u => u.userID == userID);
+				const trimmed = apiName.trim();
+
+				if (index === -1) {
+					try {
+						await create_(userID, { name: trimmed });
+					}
+					catch (err) {
+						// ignore
+					}
+				}
+				else {
+					try {
+						await save(userID, { name: trimmed }, "update");
+					}
+					catch (err) {
+						// ignore
+					}
+				}
+
+				return trimmed;
+			}
+		}
+		catch (error) {
+			// ignore
+		}
+
 		return null;
 	}
 
@@ -182,96 +283,23 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 			});
 		}
 
-		const fallbackName = "Quelqu'un";
+		if (checkData) {
+			const cachedName = getNameInDB(userID);
+			if (cachedName)
+				return cachedName;
 
-		const normalizeName = (value) => {
-			return (typeof value === "string" && value.trim()) ? value.trim() : null;
-		};
+			const remoteName = await fetchRemoteName(userID);
+			if (remoteName)
+				return remoteName;
 
-		try {
-			const dbName = normalizeName(getNameInDB(userID));
-			if (dbName) return dbName;
-
-			if (!checkData) {
-				try {
-					const userInfo = await api.getUserInfo(userID);
-					const apiUser = userInfo?.[userID] || userInfo?.[String(userID)] || userInfo;
-					const apiName = normalizeName(apiUser?.name);
-
-					if (apiName) {
-						const index = global.db.allUserData.findIndex(u => u.userID == userID);
-
-						if (index !== -1) {
-							global.db.allUserData[index].name = apiName;
-						}
-						else {
-							global.db.allUserData.push({
-								userID,
-								name: apiName
-							});
-						}
-
-						return apiName;
-					}
-				}
-				catch (error) {}
-			}
-
-			try {
-				const user = await axios.post(`https://www.facebook.com/api/graphql/?q=${`node(${userID}){name}`}`);
-				const apiName =
-					normalizeName(user?.data?.[userID]?.name) ||
-					normalizeName(user?.data?.[String(userID)]?.name) ||
-					normalizeName(user?.data?.data?.node?.name) ||
-					normalizeName(user?.data?.name);
-
-				if (apiName) {
-					const index = global.db.allUserData.findIndex(u => u.userID == userID);
-
-					if (index !== -1) {
-						global.db.allUserData[index].name = apiName;
-					}
-					else {
-						global.db.allUserData.push({
-							userID,
-							name: apiName
-						});
-					}
-
-					return apiName;
-				}
-			}
-			catch (error) {}
-
-			try {
-				const userInfo = await api.getUserInfo(userID);
-				const apiUser = userInfo?.[userID] || userInfo?.[String(userID)] || userInfo;
-				const apiName = normalizeName(apiUser?.name);
-
-				if (apiName) {
-					const index = global.db.allUserData.findIndex(u => u.userID == userID);
-
-					if (index !== -1) {
-						global.db.allUserData[index].name = apiName;
-					}
-					else {
-						global.db.allUserData.push({
-							userID,
-							name: apiName
-						});
-					}
-
-					return apiName;
-				}
-			}
-			catch (error) {}
-
-			return fallbackName;
+			return getNameInDB(userID);
 		}
-		catch (error) {
-			console.error("getName error:", error);
-			return fallbackName;
-		}
+
+		const remoteName = await fetchRemoteName(userID);
+		if (remoteName)
+			return remoteName;
+
+		return getNameInDB(userID);
 	}
 
 	async function getAvatarUrl(userID) {
@@ -281,14 +309,6 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 				message: `The first argument (userID) must be a number, not ${typeof userID}`
 			});
 		}
-		
-		try {
-			const userInfo = await api.getUserInfo([userID]);
-			if (userInfo[userID]?.thumbSrc) {
-				return userInfo[userID].thumbSrc;
-			}
-		} catch (error) {}
-		
 		try {
 			const user = await axios.post(`https://www.facebook.com/api/graphql/`, null, {
 				params: {
@@ -296,26 +316,11 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 					variables: JSON.stringify({ height: 500, scale: 1, userID, width: 500 })
 				}
 			});
-			if (user.data?.data?.profile?.profile_picture?.uri) {
-				return user.data.data.profile.profile_picture.uri;
-			}
-		} catch (error) {}
-		
-		try {
-			if (api && typeof api.getAvatarUser === 'function') {
-				return new Promise((resolve, reject) => {
-					api.getAvatarUser(userID, [500, 500], (err, data) => {
-						if (err || !data || !data[userID]) {
-							reject(err);
-						} else {
-							resolve(data[userID]);
-						}
-					});
-				});
-			}
-		} catch (error) {}
-		
-		return "https://i.ibb.co/bBSpr5v/143086968-2856368904622192-1959732218791162458-n.png";
+			return user.data.data.profile.profile_picture.uri;
+		}
+		catch (err) {
+			return "https://i.ibb.co/bBSpr5v/143086968-2856368904622192-1959732218791162458-n.png";
+		}
 	}
 
 	async function create_(userID, userInfo) {
@@ -337,7 +342,9 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 						message: `The first argument (userID) must be a number, not ${typeof userID}`
 					});
 				}
+
 				userInfo = userInfo || (await api.getUserInfo(userID))[userID];
+
 				let userData = {
 					userID,
 					name: userInfo.name,
@@ -349,6 +356,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 					settings: {},
 					data: {}
 				};
+
 				userData = await save(userID, userData, "create");
 				resolve_(_.cloneDeep(userData));
 			}
@@ -357,10 +365,12 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 			}
 			creatingUserData.splice(creatingUserData.findIndex(u => u.userID == userID), 1);
 		});
+
 		creatingUserData.push({
 			userID,
 			promise: queue
 		});
+
 		return queue;
 	}
 
@@ -384,6 +394,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 							message: `The first argument (userID) must be a number, not ${typeof userID}`
 						});
 					}
+
 					const infoUser = await get_(userID);
 					updateInfoUser = updateInfoUser || (await api.getUserInfo(userID))[userID];
 
@@ -392,6 +403,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 						vanity: updateInfoUser.vanity,
 						gender: updateInfoUser.gender
 					};
+
 					let userData = {
 						...infoUser,
 						...newData
@@ -428,11 +440,10 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 								name: "INVALID_PATH",
 								message: `The first argument (path) must be a string or object, not ${typeof path}`
 							});
+						else if (typeof path === "string")
+							return resolve(dataReturn.map(uData => _.get(uData, path, defaultValue)));
 						else
-							if (typeof path === "string")
-								return resolve(dataReturn.map(uData => _.get(uData, path, defaultValue)));
-							else
-								return resolve(dataReturn.map(uData => _.times(path.length, i => _.get(uData, path[i], defaultValue[i]))));
+							return resolve(dataReturn.map(uData => _.times(path.length, i => _.get(uData, path[i], defaultValue[i]))));
 
 					return resolve(dataReturn);
 				}
@@ -473,11 +484,10 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 					name: "INVALID_PATH",
 					message: `The second argument (path) must be a string or array, not ${typeof path}`
 				});
+			else if (typeof path === "string")
+				return _.cloneDeep(_.get(userData, path, defaultValue));
 			else
-				if (typeof path === "string")
-					return _.cloneDeep(_.get(userData, path, defaultValue));
-				else
-					return _.cloneDeep(_.times(path.length, i => _.get(userData, path[i], defaultValue[i])));
+				return _.cloneDeep(_.times(path.length, i => _.get(userData, path[i], defaultValue[i])));
 
 		return _.cloneDeep(userData);
 	}
@@ -541,7 +551,7 @@ module.exports = async function (databaseType, userModel, api, fakeGraphql) {
 					if (typeof path !== "string")
 						throw new CustomError({
 							name: "INVALID_PATH",
-							message: `The second argument (path) must be a string, not a ${typeof path}`
+							message: `The second argument (path) must be a string, not ${typeof path}`
 						});
 					const spitPath = path.split(".");
 					if (spitPath.length == 1)
