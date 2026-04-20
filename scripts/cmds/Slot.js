@@ -1,10 +1,32 @@
 const fs = require("fs");
 const { createCanvas } = require("canvas");
+const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
+
+const COOLDOWN_FILE = "./slot_cooldowns.json";
+let slotCooldowns = new Map();
+
+if (fs.existsSync(COOLDOWN_FILE)) {
+    try {
+        const data = JSON.parse(fs.readFileSync(COOLDOWN_FILE, "utf8"));
+        slotCooldowns = new Map(Object.entries(data));
+    } catch (e) {
+        console.error("Erreur chargement slot_cooldowns.json:", e);
+    }
+}
+
+async function saveCooldowns() {
+    try {
+        const obj = Object.fromEntries(slotCooldowns);
+        fs.writeFileSync(COOLDOWN_FILE, JSON.stringify(obj, null, 2));
+    } catch (e) {
+        console.error("Erreur sauvegarde slot_cooldowns.json:", e);
+    }
+}
 
 module.exports = {
     config: {
         name: "slot",
-        version: "2.0",
+        version: "2.3",
         author: "Itachi Soma",
         countDown: 3,
         role: 0,
@@ -13,14 +35,49 @@ module.exports = {
             en: "Slot machine game"
         },
         longDescription: {
-            en: "Play slot machine with your money! Jackpot x10, x5, x3, x2"
+            en: "Play slot machine with your money! Jackpot x10, x5, x3, x2. 20 spins per 30 minutes."
         }
     },
 
     onStart: async function ({ args, message, event, api, usersData }) {
         const { senderID } = event;
         const userData = await usersData.get(senderID);
-        const amount = parseAmountWithSuffix(args[0]);
+        
+        async function parseAmountWithSuffix(input) {
+            if (!input) return NaN;
+            try {
+                const response = await fetch(`${CONVERT_API_URL}?input=${encodeURIComponent(input)}`);
+                const data = await response.json();
+                if (data.success && typeof data.result === 'number') {
+                    return data.result;
+                }
+            } catch (error) {
+                console.error("Conversion API error, fallback to local parser:", error);
+            }
+            // Fallback local
+            const str = String(input).toLowerCase().replace(/\s/g, '');
+            const SUFFIXES = {
+                'k': 1e3, 'm': 1e6, 'b': 1e9, 't': 1e12, 'q': 1e15,
+                'Q': 1e18, 's': 1e21, 'S': 1e24, 'o': 1e27, 'n': 1e30, 'd': 1e33
+            };
+            const scientificMatch = str.match(/^(\d+(?:\.\d+)?)e(\d+)$/i);
+            if (scientificMatch) {
+                return Math.floor(parseFloat(scientificMatch[1]) * Math.pow(10, parseInt(scientificMatch[2])));
+            }
+            const suffixChars = Object.keys(SUFFIXES).join('');
+            const regex = new RegExp(`^(\\d+(?:\\.\\d+)?)([${suffixChars}]?)$`, 'i');
+            const match = str.match(regex);
+            if (!match) return parseFloat(str);
+            let value = parseFloat(match[1]);
+            const suffix = match[2]?.toLowerCase();
+            if (isNaN(value)) return NaN;
+            if (suffix && SUFFIXES[suffix]) {
+                value *= SUFFIXES[suffix];
+            }
+            return Math.floor(value);
+        }
+
+        const amount = await parseAmountWithSuffix(args[0]);
         
         const bankPath = "./bank.json";
         let bankData = {};
@@ -33,50 +90,104 @@ module.exports = {
         const userInfo = await api.getUserInfo(senderID);
         const username = userInfo[senderID].name;
         
-        function parseAmountWithSuffix(input) {
-            if (!input) return NaN;
-            const str = input.toString().toLowerCase().replace(/\s/g, '');
-            
-            const suffixes = {
-                'k': 1000,
-                'm': 1000000,
-                'b': 1000000000,
-                't': 1000000000000,
-                'q': 1000000000000000
-            };
-            
-            const match = str.match(/^(\d+(?:\.\d+)?)([kmbtq]?)$/i);
-            if (!match) return parseFloat(str);
-            
-            let value = parseFloat(match[1]);
-            const suffix = match[2].toLowerCase();
-            
-            if (isNaN(value)) return NaN;
-            
-            if (suffixes[suffix]) {
-                value *= suffixes[suffix];
-            }
-            
-            return Math.floor(value);
-        }
-        
         function formatNumber(num) {
-            if (num >= 1000000000000) {
-                return (num / 1000000000000).toFixed(1).replace(/\.0$/, '') + 'T';
+            if (num === null || num === undefined || isNaN(num)) return "0";
+            const suffixes = [
+                { value: 1e33, suffix: 'd' }, { value: 1e30, suffix: 'n' }, { value: 1e27, suffix: 'o' },
+                { value: 1e24, suffix: 'S' }, { value: 1e21, suffix: 's' }, { value: 1e18, suffix: 'Q' },
+                { value: 1e15, suffix: 'q' }, { value: 1e12, suffix: 't' }, { value: 1e9, suffix: 'b' },
+                { value: 1e6, suffix: 'm' }, { value: 1e3, suffix: 'k' }
+            ];
+            const absNum = Math.abs(num);
+            const sign = num < 0 ? "-" : "";
+            for (const s of suffixes) {
+                if (absNum >= s.value) {
+                    return sign + (absNum / s.value).toFixed(1).replace(/\.0$/, '') + s.suffix;
+                }
             }
-            if (num >= 1000000000) {
-                return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
+            return sign + absNum.toString();
+        }
+
+        function formatTimeRemaining(ms) {
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            return `${minutes}m ${seconds}s`;
+        }
+
+        function getSlotCooldown(userId) {
+            if (!slotCooldowns.has(userId)) {
+                slotCooldowns.set(userId, {
+                    spins: 15,
+                    maxSpins: 15,
+                    resetTime: Date.now() + 30 * 60 * 1000
+                });
+                saveCooldowns();
             }
-            if (num >= 1000000) {
-                return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            
+            const cooldown = slotCooldowns.get(userId);
+            const now = Date.now();
+            
+            if (now > cooldown.resetTime) {
+                console.log(`[SLOT] Réinitialisation des tours pour ${userId}`);
+                cooldown.spins = cooldown.maxSpins;
+                cooldown.resetTime = now + 30 * 60 * 1000;
+                slotCooldowns.set(userId, cooldown);
+                saveCooldowns();
             }
-            if (num >= 1000) {
-                return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+            
+            return cooldown;
+        }
+
+        function useSpin(userId) {
+            const cooldown = getSlotCooldown(userId);
+            if (cooldown.spins > 0) {
+                cooldown.spins--;
+                slotCooldowns.set(userId, cooldown);
+                saveCooldowns();
+                return true;
             }
-            return num.toString();
+            return false;
+        }
+
+        function getRemainingSpins(userId) {
+            const cooldown = getSlotCooldown(userId);
+            return {
+                spins: cooldown.spins,
+                maxSpins: cooldown.maxSpins,
+                resetTime: cooldown.resetTime,
+                timeRemaining: Math.max(0, cooldown.resetTime - Date.now())
+            };
+        }
+
+        if (args[0]?.toLowerCase() === "stats") {
+            const stats = getRemainingSpins(senderID);
+            const progressBar = "█".repeat(Math.floor(stats.spins / stats.maxSpins * 20)) + 
+                               "░".repeat(20 - Math.floor(stats.spins / stats.maxSpins * 20));
+            
+            return message.reply(
+                `🎰 𝐒𝐋𝐎𝐓 𝐒𝐓𝐀𝐓𝐒\n` +
+                `━━━━━━━━━━━━━━━━\n` +
+                `🎲 𝐓𝐨𝐮𝐫𝐬 𝐫𝐞𝐬𝐭𝐚𝐧𝐭𝐬 : ${stats.spins}/${stats.maxSpins}\n` +
+                `📊 ${progressBar}\n` +
+                `━━━━━━━━━━━━━━━━\n` +
+                `⏰ 𝐑𝐞𝐜𝐡𝐚𝐫𝐠𝐞𝐦𝐞𝐧𝐭 𝐝𝐚𝐧𝐬 : ${formatTimeRemaining(stats.timeRemaining)}\n` +
+                `━━━━━━━━━━━━━━━━`
+            );
+        }
+
+        const spinStats = getRemainingSpins(senderID);
+        if (spinStats.spins <= 0) {
+            return message.reply(
+                `❌ 𝐏𝐥𝐮𝐬 𝐝𝐞 𝐭𝐨𝐮𝐫𝐬 𝐝𝐢𝐬𝐩𝐨𝐧𝐢𝐛𝐥𝐞𝐬 !\n` +
+                `━━━━━━━━━━━━━━━━\n` +
+                `🎰 𝐕𝐨𝐮𝐬 𝐚𝐯𝐞𝐳 𝐮𝐭𝐢𝐥𝐢𝐬𝐞́ 𝐯𝐨𝐬 𝟐𝟎 𝐭𝐨𝐮𝐫𝐬.\n` +
+                `⏰ 𝐑𝐞𝐜𝐡𝐚𝐫𝐠𝐞𝐦𝐞𝐧𝐭 𝐝𝐚𝐧𝐬 : ${formatTimeRemaining(spinStats.timeRemaining)}\n` +
+                `━━━━━━━━━━━━━━━━\n` +
+                `📊 𝐓𝐚𝐩𝐞𝐳 ~𝐬𝐥𝐨𝐭 𝐬𝐭𝐚𝐭𝐬 𝐩𝐨𝐮𝐫 𝐯𝐨𝐢𝐫 𝐯𝐨𝐬 𝐬𝐭𝐚𝐭𝐢𝐬𝐭𝐢𝐪𝐮𝐞𝐬.`
+            );
         }
         
-        async function generateSlotCard(username, amount, win, winAmount, newBalance, slots, multiplier) {
+        async function generateSlotCard(username, amount, win, winAmount, newBalance, slots, multiplier, remainingSpins) {
             const canvas = createCanvas(600, 420);
             const ctx = canvas.getContext("2d");
             
@@ -125,6 +236,10 @@ module.exports = {
             ctx.font = "bold 14px 'Courier New'";
             ctx.fillText(`MULTIPLICATEUR: x${multiplier}`, 380, 240);
             
+            ctx.fillStyle = "#aaa";
+            ctx.font = "bold 11px 'Courier New'";
+            ctx.fillText(`Tours restants: ${remainingSpins}/20`, 380, 265);
+            
             ctx.fillStyle = "#d4af37";
             ctx.font = "bold 28px 'Courier New'";
             ctx.fillText(`${formatNumber(newBalance)}$`, 30, 315);
@@ -135,11 +250,11 @@ module.exports = {
             if (win) {
                 ctx.fillStyle = "#00ff88";
                 ctx.font = "bold 16px 'Courier New'";
-                ctx.fillText(`GAIN: +${formatNumber(winAmount)}$`, 380, 290);
+                ctx.fillText(`GAIN: +${formatNumber(winAmount)}$`, 380, 315);
             } else {
                 ctx.fillStyle = "#ff4444";
                 ctx.font = "bold 16px 'Courier New'";
-                ctx.fillText(`PERTE: -${formatNumber(amount)}$`, 380, 290);
+                ctx.fillText(`PERTE: -${formatNumber(amount)}$`, 380, 315);
             }
             
             ctx.fillStyle = "#d4af37";
@@ -176,18 +291,18 @@ module.exports = {
         const winAmount = result.winAmount;
         const multiplier = result.multiplier;
         
+        useSpin(senderID);
+        const updatedStats = getRemainingSpins(senderID);
+        
         await usersData.set(senderID, { money: userData.money + winAmount });
         const newUserData = await usersData.get(senderID);
         const newBalance = newUserData.money;
         
-        let resultText = "";
         let resultMsg = "";
         
         if (win) {
-            resultText = `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n✨ 𝐆𝐚𝐢𝐧 : +${formatNumber(winAmount)}$ (𝐱${multiplier})\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
             resultMsg = `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n━━━━━━━━━━━━━━━━\n✨ 𝐆𝐚𝐢𝐧 : +${formatNumber(winAmount)}$ (𝐱${multiplier})\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
         } else {
-            resultText = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n📉 𝐏𝐞𝐫𝐭𝐞 : -${formatNumber(amount)}$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
             resultMsg = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 𝐏𝐞𝐫𝐭𝐞 : -${formatNumber(amount)}$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
         }
         
@@ -199,12 +314,14 @@ module.exports = {
 💰 𝐌𝐢𝐬𝐞 : ${formatNumber(amount)}$
 ━━━━━━━━━━━━━━━━
 ${resultMsg}
+━━━━━━━━━━━━━━━━
+🎰 𝐓𝐨𝐮𝐫𝐬 𝐫𝐞𝐬𝐭𝐚𝐧𝐭𝐬 : ${updatedStats.spins}/${updatedStats.maxSpins}
 ━━━━━━━━━━━━━━━━`
         );
         
         if (userBank.imageMode !== false) {
             try {
-                const cardImage = await generateSlotCard(username, amount, win, winAmount, newBalance, [slot1, slot2, slot3], multiplier);
+                const cardImage = await generateSlotCard(username, amount, win, winAmount, newBalance, [slot1, slot2, slot3], multiplier, updatedStats.spins);
                 const imgPath = `./slot_card_${senderID}.png`;
                 fs.writeFileSync(imgPath, cardImage);
                 await message.reply({
