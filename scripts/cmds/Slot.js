@@ -1,6 +1,23 @@
 const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
 const { createCanvas } = require("canvas");
 const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
+
+const SOUND_URLS = {
+    spin: "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3",
+    win: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3",
+    lose: "https://assets.mixkit.co/active_storage/sfx/837/837-preview.mp3"
+};
+
+async function sendRemoteSound(url, message) {
+    try {
+        const response = await axios.get(url, { responseType: "stream" });
+        await message.reply({ attachment: response.data });
+    } catch (err) {
+        console.error("Erreur son:", err);
+    }
+}
 
 const COOLDOWN_FILE = "./slot_cooldowns.json";
 let slotCooldowns = new Map();
@@ -23,26 +40,31 @@ async function saveCooldowns() {
     }
 }
 
+function getDisplaySymbols(slots) {
+    const map = {
+        "🤍": "◯",
+        "🖤": "✕",
+        "💚": "◆"
+    };
+    return slots.map(e => map[e] || e);
+}
+
 module.exports = {
     config: {
         name: "slot",
-        version: "2.3",
+        version: "2.5",
         author: "Itachi Soma",
         countDown: 3,
         role: 0,
         category: "fun",
-        shortDescription: {
-            en: "Slot machine game"
-        },
-        longDescription: {
-            en: "Play slot machine with your money! Jackpot x10, x5, x3, x2. 20 spins per 30 minutes."
-        }
+        shortDescription: { en: "Slot machine game" },
+        longDescription: { en: "Play slot machine with your money! Jackpot x10, x5, x3, x2. 15 spins per 30 minutes." }
     },
 
     onStart: async function ({ args, message, event, api, usersData }) {
         const { senderID } = event;
         const userData = await usersData.get(senderID);
-        
+
         async function parseAmountWithSuffix(input) {
             if (!input) return NaN;
             try {
@@ -54,7 +76,6 @@ module.exports = {
             } catch (error) {
                 console.error("Conversion API error, fallback to local parser:", error);
             }
-            // Fallback local
             const str = String(input).toLowerCase().replace(/\s/g, '');
             const SUFFIXES = {
                 'k': 1e3, 'm': 1e6, 'b': 1e9, 't': 1e12, 'q': 1e15,
@@ -78,18 +99,17 @@ module.exports = {
         }
 
         const amount = await parseAmountWithSuffix(args[0]);
-        
+
         const bankPath = "./bank.json";
         let bankData = {};
-        
         if (fs.existsSync(bankPath)) {
             bankData = JSON.parse(fs.readFileSync(bankPath, "utf8"));
         }
-        
+
         const userBank = bankData[senderID] || { bank: 0, imageMode: true };
         const userInfo = await api.getUserInfo(senderID);
         const username = userInfo[senderID].name;
-        
+
         function formatNumber(num) {
             if (num === null || num === undefined || isNaN(num)) return "0";
             const suffixes = [
@@ -123,10 +143,8 @@ module.exports = {
                 });
                 saveCooldowns();
             }
-            
             const cooldown = slotCooldowns.get(userId);
             const now = Date.now();
-            
             if (now > cooldown.resetTime) {
                 console.log(`[SLOT] Réinitialisation des tours pour ${userId}`);
                 cooldown.spins = cooldown.maxSpins;
@@ -134,7 +152,6 @@ module.exports = {
                 slotCooldowns.set(userId, cooldown);
                 saveCooldowns();
             }
-            
             return cooldown;
         }
 
@@ -161,9 +178,8 @@ module.exports = {
 
         if (args[0]?.toLowerCase() === "stats") {
             const stats = getRemainingSpins(senderID);
-            const progressBar = "█".repeat(Math.floor(stats.spins / stats.maxSpins * 20)) + 
+            const progressBar = "█".repeat(Math.floor(stats.spins / stats.maxSpins * 20)) +
                                "░".repeat(20 - Math.floor(stats.spins / stats.maxSpins * 20));
-            
             return message.reply(
                 `🎰 𝐒𝐋𝐎𝐓 𝐒𝐓𝐀𝐓𝐒\n` +
                 `━━━━━━━━━━━━━━━━\n` +
@@ -180,40 +196,35 @@ module.exports = {
             return message.reply(
                 `❌ 𝐏𝐥𝐮𝐬 𝐝𝐞 𝐭𝐨𝐮𝐫𝐬 𝐝𝐢𝐬𝐩𝐨𝐧𝐢𝐛𝐥𝐞𝐬 !\n` +
                 `━━━━━━━━━━━━━━━━\n` +
-                `🎰 𝐕𝐨𝐮𝐬 𝐚𝐯𝐞𝐳 𝐮𝐭𝐢𝐥𝐢𝐬𝐞́ 𝐯𝐨𝐬 𝟐𝟎 𝐭𝐨𝐮𝐫𝐬.\n` +
+                `🎰 𝐕𝐨𝐮𝐬 𝐚𝐯𝐞𝐳 𝐮𝐭𝐢𝐥𝐢𝐬𝐞́ 𝐯𝐨𝐬 𝟏5 𝐭𝐨𝐮𝐫𝐬.\n` +
                 `⏰ 𝐑𝐞𝐜𝐡𝐚𝐫𝐠𝐞𝐦𝐞𝐧𝐭 𝐝𝐚𝐧𝐬 : ${formatTimeRemaining(spinStats.timeRemaining)}\n` +
                 `━━━━━━━━━━━━━━━━\n` +
                 `📊 𝐓𝐚𝐩𝐞𝐳 ~𝐬𝐥𝐨𝐭 𝐬𝐭𝐚𝐭𝐬 𝐩𝐨𝐮𝐫 𝐯𝐨𝐢𝐫 𝐯𝐨𝐬 𝐬𝐭𝐚𝐭𝐢𝐬𝐭𝐢𝐪𝐮𝐞𝐬.`
             );
         }
-        
-        async function generateSlotCard(username, amount, win, winAmount, newBalance, slots, multiplier, remainingSpins) {
+
+        async function generateSlotCard(username, amount, win, winAmount, newBalance, displaySlots, multiplier, remainingSpins) {
             const canvas = createCanvas(600, 420);
             const ctx = canvas.getContext("2d");
-            
             const gradient = ctx.createLinearGradient(0, 0, 600, 420);
             gradient.addColorStop(0, "#1a1a2e");
             gradient.addColorStop(0.5, "#16213e");
             gradient.addColorStop(1, "#0f3460");
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, 600, 420);
-            
             ctx.strokeStyle = "#d4af37";
             ctx.lineWidth = 3;
             ctx.strokeRect(10, 10, 580, 400);
-            
             ctx.fillStyle = "#d4af37";
             ctx.font = "bold 20px 'Courier New'";
             ctx.fillText("UCHIWA SLOT", 30, 55);
             ctx.font = "10px 'Courier New'";
             ctx.fillStyle = "#aaa";
             ctx.fillText("MACHINE A SOUS", 30, 75);
-            
             ctx.fillStyle = "#d4af37";
             ctx.fillRect(480, 35, 45, 30);
             ctx.fillStyle = "#b8960c";
             ctx.fillRect(484, 39, 37, 22);
-            
             const cardHolder = username.toUpperCase().substring(0, 18);
             ctx.fillStyle = "#fff";
             ctx.font = "bold 12px 'Courier New'";
@@ -221,32 +232,26 @@ module.exports = {
             ctx.fillStyle = "#aaa";
             ctx.font = "9px 'Courier New'";
             ctx.fillText("PLAYER", 30, 125);
-            
             ctx.fillStyle = "#ffd700";
             ctx.font = "bold 16px 'Courier New'";
             ctx.fillText("RESULTAT", 380, 110);
-            
-            ctx.font = "48px 'Segoe UI Emoji'";
+            ctx.font = "bold 48px 'Courier New'";
             ctx.fillStyle = "#fff";
-            ctx.fillText(slots[0], 380, 180);
-            ctx.fillText(slots[1], 440, 180);
-            ctx.fillText(slots[2], 500, 180);
-            
+            ctx.fillText(displaySlots[0], 380, 180);
+            ctx.fillText(displaySlots[1], 440, 180);
+            ctx.fillText(displaySlots[2], 500, 180);
             ctx.fillStyle = "#88ff88";
             ctx.font = "bold 14px 'Courier New'";
             ctx.fillText(`MULTIPLICATEUR: x${multiplier}`, 380, 240);
-            
             ctx.fillStyle = "#aaa";
             ctx.font = "bold 11px 'Courier New'";
-            ctx.fillText(`Tours restants: ${remainingSpins}/20`, 380, 265);
-            
+            ctx.fillText(`Tours restants: ${remainingSpins}/15`, 380, 265);
             ctx.fillStyle = "#d4af37";
             ctx.font = "bold 28px 'Courier New'";
             ctx.fillText(`${formatNumber(newBalance)}$`, 30, 315);
             ctx.fillStyle = "#aaa";
             ctx.font = "10px 'Courier New'";
             ctx.fillText("NEW BALANCE", 30, 340);
-            
             if (win) {
                 ctx.fillStyle = "#00ff88";
                 ctx.font = "bold 16px 'Courier New'";
@@ -256,56 +261,54 @@ module.exports = {
                 ctx.font = "bold 16px 'Courier New'";
                 ctx.fillText(`PERTE: -${formatNumber(amount)}$`, 380, 315);
             }
-            
             ctx.fillStyle = "#d4af37";
             ctx.font = "bold 14px 'Courier New'";
             ctx.fillText("🎰", 540, 100);
-            
             ctx.fillStyle = "#aaa";
             ctx.fillRect(560, 380, 20, 15);
-            
             const date = new Date();
             const dateStr = `${date.getDate()}/${date.getMonth()+1}/${date.getFullYear()}`;
             ctx.fillStyle = "#666";
             ctx.font = "9px 'Courier New'";
             ctx.fillText(dateStr, 30, 395);
-            
             return canvas.toBuffer();
         }
-        
+
         if (isNaN(amount) || amount <= 0) {
             return message.reply(`❌ 𝐌𝐨𝐧𝐭𝐚𝐧𝐭 𝐢𝐧𝐯𝐚𝐥𝐢𝐝𝐞\n━━━━━━━━━━━━━━━━\n📝 𝐔𝐭𝐢𝐥𝐢𝐬𝐚𝐭𝐢𝐨𝐧 : ${global.utils.getPrefix(event.threadID)}𝐬𝐥𝐨𝐭 <𝐦𝐨𝐧𝐭𝐚𝐧𝐭>\n💳 𝐄𝐱𝐞𝐦𝐩𝐥𝐞 : ${global.utils.getPrefix(event.threadID)}𝐬𝐥𝐨𝐭 𝟓𝟎𝐤`);
         }
-        
+
         if (amount > userData.money) {
             return message.reply(`❌ 𝐅𝐨𝐧𝐝𝐬 𝐢𝐧𝐬𝐮𝐟𝐟𝐢𝐬𝐚𝐧𝐭𝐬\n━━━━━━━━━━━━━━━━\n💰 𝐓𝐨𝐧 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(userData.money)}$\n🎰 𝐌𝐨𝐧𝐭𝐚𝐧𝐭 : ${formatNumber(amount)}$`);
         }
-        
-        const slots = ["🤍", "🖤", "💚", "🖤", "🤍", "💚", "💚", "🖤", "🤍"];
-        const slot1 = slots[Math.floor(Math.random() * slots.length)];
-        const slot2 = slots[Math.floor(Math.random() * slots.length)];
-        const slot3 = slots[Math.floor(Math.random() * slots.length)];
-        
+
+        const emojiSlots = ["🤍", "🖤", "💚", "🖤", "🤍", "💚", "💚", "🖤", "🤍"];
+        const slot1 = emojiSlots[Math.floor(Math.random() * emojiSlots.length)];
+        const slot2 = emojiSlots[Math.floor(Math.random() * emojiSlots.length)];
+        const slot3 = emojiSlots[Math.floor(Math.random() * emojiSlots.length)];
+
         const result = calculateWinnings(slot1, slot2, slot3, amount);
         const win = result.win;
         const winAmount = result.winAmount;
         const multiplier = result.multiplier;
-        
+
         useSpin(senderID);
         const updatedStats = getRemainingSpins(senderID);
-        
+
         await usersData.set(senderID, { money: userData.money + winAmount });
         const newUserData = await usersData.get(senderID);
         const newBalance = newUserData.money;
-        
+
         let resultMsg = "";
-        
         if (win) {
             resultMsg = `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n━━━━━━━━━━━━━━━━\n✨ 𝐆𝐚𝐢𝐧 : +${formatNumber(winAmount)}$ (𝐱${multiplier})\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
         } else {
             resultMsg = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 𝐏𝐞𝐫𝐭𝐞 : -${formatNumber(amount)}$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
         }
-        
+
+        await sendRemoteSound(SOUND_URLS.spin, message);
+        await new Promise(r => setTimeout(r, 1000));
+
         await message.reply(
 `🎰 𝐒𝐋𝐎𝐓 𝐌𝐀𝐂𝐇𝐈𝐍𝐄 🎰
 ━━━━━━━━━━━━━━━━
@@ -318,10 +321,26 @@ ${resultMsg}
 🎰 𝐓𝐨𝐮𝐫𝐬 𝐫𝐞𝐬𝐭𝐚𝐧𝐭𝐬 : ${updatedStats.spins}/${updatedStats.maxSpins}
 ━━━━━━━━━━━━━━━━`
         );
-        
+
+        if (win) {
+            sendRemoteSound(SOUND_URLS.win, message);
+        } else {
+            sendRemoteSound(SOUND_URLS.lose, message);
+        }
+
         if (userBank.imageMode !== false) {
             try {
-                const cardImage = await generateSlotCard(username, amount, win, winAmount, newBalance, [slot1, slot2, slot3], multiplier, updatedStats.spins);
+                const displaySlots = getDisplaySymbols([slot1, slot2, slot3]);
+                const cardImage = await generateSlotCard(
+                    username,
+                    amount,
+                    win,
+                    winAmount,
+                    newBalance,
+                    displaySlots,
+                    multiplier,
+                    updatedStats.spins
+                );
                 const imgPath = `./slot_card_${senderID}.png`;
                 fs.writeFileSync(imgPath, cardImage);
                 await message.reply({
