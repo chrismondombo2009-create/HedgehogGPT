@@ -147,14 +147,14 @@ module.exports = {
     config: {
         name: "daily",
         version: "2.0",
-        author: "NTKhang & Itachi Soma",
+        author: "NTKhang, updated byItachi Soma",
         countDown: 5,
         role: 0,
         description: {
             vi: "Nhận quà hàng ngày",
             en: "Receive daily gift"
         },
-        category: "game",
+        category: "economy",
         guide: {
             vi: "   {pn}: Nhận quà hàng ngày"
                 + "\n   {pn} info: Xem thông tin quà hàng ngày",
@@ -163,8 +163,8 @@ module.exports = {
         },
         envConfig: {
             rewardFirstDay: {
-                coin: 100,
-                exp: 10
+                coin: 20000,
+                exp: 100
             }
         }
     },
