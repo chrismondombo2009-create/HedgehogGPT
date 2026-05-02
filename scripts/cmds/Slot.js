@@ -3,12 +3,17 @@ const path = require("path");
 const axios = require("axios");
 const { createCanvas } = require("canvas");
 const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
+const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
 
 const SOUND_URLS = {
-    spin: "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3",
     win: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3",
     lose: "https://assets.mixkit.co/active_storage/sfx/837/837-preview.mp3"
 };
+
+function getTicTacSoundURL() {
+    const text = encodeURIComponent("tic-tac tic-tac tic-tac tic-tac tic-tac");
+    return `https://translate.google.com/translate_tts?ie=UTF-8&q=${text}&tl=fr&client=tw-ob`;
+}
 
 async function sendRemoteSound(url, message) {
     try {
@@ -16,6 +21,28 @@ async function sendRemoteSound(url, message) {
         await message.reply({ attachment: response.data });
     } catch (err) {
         console.error("Erreur son:", err);
+    }
+}
+
+async function getUserCash(userId) {
+    try {
+        const response = await axios.get(`${CASH_API_URL}/${userId}`);
+        if (response.data.success) return response.data.data.cash;
+    } catch (error) {
+        console.error("Cash API Error:", error.message);
+    }
+    return 0;
+}
+
+async function updateUserCash(userId, amount) {
+    try {
+        if (amount >= 0) {
+            await axios.post(`${CASH_API_URL}/${userId}/add`, { amount });
+        } else {
+            await axios.post(`${CASH_API_URL}/${userId}/subtract`, { amount: Math.abs(amount) });
+        }
+    } catch (error) {
+        console.error("Cash API Update Error:", error.message);
     }
 }
 
@@ -52,7 +79,7 @@ function getDisplaySymbols(slots) {
 module.exports = {
     config: {
         name: "slot",
-        version: "2.5",
+        version: "2.7",
         author: "Itachi Soma",
         countDown: 3,
         role: 0,
@@ -61,9 +88,9 @@ module.exports = {
         longDescription: { en: "Play slot machine with your money! Jackpot x10, x5, x3, x2. 15 spins per 30 minutes." }
     },
 
-    onStart: async function ({ args, message, event, api, usersData }) {
+    onStart: async function ({ args, message, event, api }) {
         const { senderID } = event;
-        const userData = await usersData.get(senderID);
+        const userMoney = await getUserCash(senderID);
 
         async function parseAmountWithSuffix(input) {
             if (!input) return NaN;
@@ -278,8 +305,8 @@ module.exports = {
             return message.reply(`❌ 𝐌𝐨𝐧𝐭𝐚𝐧𝐭 𝐢𝐧𝐯𝐚𝐥𝐢𝐝𝐞\n━━━━━━━━━━━━━━━━\n📝 𝐔𝐭𝐢𝐥𝐢𝐬𝐚𝐭𝐢𝐨𝐧 : ${global.utils.getPrefix(event.threadID)}𝐬𝐥𝐨𝐭 <𝐦𝐨𝐧𝐭𝐚𝐧𝐭>\n💳 𝐄𝐱𝐞𝐦𝐩𝐥𝐞 : ${global.utils.getPrefix(event.threadID)}𝐬𝐥𝐨𝐭 𝟓𝟎𝐤`);
         }
 
-        if (amount > userData.money) {
-            return message.reply(`❌ 𝐅𝐨𝐧𝐝𝐬 𝐢𝐧𝐬𝐮𝐟𝐟𝐢𝐬𝐚𝐧𝐭𝐬\n━━━━━━━━━━━━━━━━\n💰 𝐓𝐨𝐧 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(userData.money)}$\n🎰 𝐌𝐨𝐧𝐭𝐚𝐧𝐭 : ${formatNumber(amount)}$`);
+        if (amount > userMoney) {
+            return message.reply(`❌ 𝐅𝐨𝐧𝐝𝐬 𝐢𝐧𝐬𝐮𝐟𝐟𝐢𝐬𝐚𝐧𝐭𝐬\n━━━━━━━━━━━━━━━━\n💰 𝐓𝐨𝐧 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(userMoney)}$\n🎰 𝐌𝐨𝐧𝐭𝐚𝐧𝐭 : ${formatNumber(amount)}$`);
         }
 
         const emojiSlots = ["🤍", "🖤", "💚", "🖤", "🤍", "💚", "💚", "🖤", "🤍"];
@@ -293,11 +320,11 @@ module.exports = {
         const multiplier = result.multiplier;
 
         useSpin(senderID);
-        const updatedStats = getRemainingSpins(senderID);
 
-        await usersData.set(senderID, { money: userData.money + winAmount });
-        const newUserData = await usersData.get(senderID);
-        const newBalance = newUserData.money;
+        await updateUserCash(senderID, winAmount);
+        const newBalance = await getUserCash(senderID);
+
+        const updatedStats = getRemainingSpins(senderID);
 
         let resultMsg = "";
         if (win) {
@@ -306,8 +333,8 @@ module.exports = {
             resultMsg = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 𝐏𝐞𝐫𝐭𝐞 : -${formatNumber(amount)}$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
         }
 
-        await sendRemoteSound(SOUND_URLS.spin, message);
-        await new Promise(r => setTimeout(r, 1000));
+        await sendRemoteSound(getTicTacSoundURL(), message);
+        await new Promise(r => setTimeout(r, 5000));
 
         await message.reply(
 `🎰 𝐒𝐋𝐎𝐓 𝐌𝐀𝐂𝐇𝐈𝐍𝐄 🎰
