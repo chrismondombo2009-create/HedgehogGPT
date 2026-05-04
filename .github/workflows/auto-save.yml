@@ -1,0 +1,49 @@
+name: 🤖 Auto Backup Commands
+
+on:
+  # Se déclenche quand tu pushes
+  push:
+    paths:
+      - 'scripts/cmds/**'
+      - 'config.dev.json'
+      - 'bank.json'
+    branches:
+      - main
+
+  # Sauvegarde automatique TOUTES LES 10 MINUTES ⏰
+  schedule:
+    - cron: '*/10 * * * *'
+
+  # Permet de lancer manuellement
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 Récupérer le code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔄 Vérifier si des fichiers ont changé
+        id: check_changes
+        run: |
+          git add scripts/cmds/ config.dev.json bank.json
+          if git diff --cached --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 💾 Commit et push des changements
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "HedgehogGPT Bot"
+          git config.user.email "hedgehog-bot@users.noreply.github.com"
+          git commit -m "🤖 Auto-backup commandes - $(date '+%Y-%m-%d %H:%M:%S')"
+          git push
