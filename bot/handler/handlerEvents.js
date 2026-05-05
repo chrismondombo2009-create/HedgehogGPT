@@ -61,7 +61,6 @@ function getRoleConfig(utils, command, isGroup, threadData, commandName) {
 function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, commandName, message, lang) {
     const config = global.GoatBot.config;
     const { adminBot, developer, vipuser, hideNotiMessage, developerOnly, vipOnly } = config;
-    const allHighRoles = [...adminBot, ...developer, ...vipuser];
     const role = getRole(threadData, senderID);
 
     const infoBannedUser = userData.banned;
@@ -209,6 +208,7 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
         let isUserCallCommand = false;
 
+        // ---------- CORRECTION : ON START AVEC OU SANS PREFIX ----------
         async function onStart() {
             const enablePrefixless = config.adminOnly?.enablePrefixless || false;
 
@@ -216,9 +216,11 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
             let commandName, args;
             if (body.startsWith(prefix)) {
+                // Mode avec préfixe
                 args = body.slice(prefix.length).trim().split(/ +/);
                 commandName = args.shift().toLowerCase();
             } else if (enablePrefixless) {
+                // Mode sans préfixe
                 args = body.trim().split(/ +/);
                 commandName = args.shift().toLowerCase();
             } else {
@@ -346,6 +348,8 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                 return await message.reply(utils.getText({ lang: langCode, head: "handlerEvents" }, "errorOccurred", time, commandName, removeHomeDir(err.stack ? err.stack.split("\n").slice(0, 5).join("\n") : JSON.stringify(err, null, 2))));
             }
         }
+
+        // ----- FIN DE LA CORRECTION -----
 
         async function onChat() {
             const allOnChat = GoatBot.onChat || [];
