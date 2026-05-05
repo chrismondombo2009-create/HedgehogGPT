@@ -216,11 +216,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
             let commandName, args;
             if (body.startsWith(prefix)) {
-                // Mode avec préfixe
                 args = body.slice(prefix.length).trim().split(/ +/);
                 commandName = args.shift().toLowerCase();
             } else if (enablePrefixless) {
-                // Mode sans préfixe
                 args = body.trim().split(/ +/);
                 commandName = args.shift().toLowerCase();
             } else {
@@ -243,12 +241,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
             // ----- IGNORER LES COMMANDES INCONNUES EN MODE SANS PRÉFIXE -----
             if (!command) {
                 if (!body.startsWith(prefix) && enablePrefixless) {
-                    // Aucune commande trouvée et l'utilisateur n'a pas utilisé le préfixe → on ignore
                     return;
                 }
-                // Mode préfixe : comportement normal (message d'erreur)
                 if (!hideNotiMessage.commandNotFound) {
-                    // Pour éviter l'erreur de traduction manquante, on utilise un fallback simple
                     try {
                         return await message.reply(
                             utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound", commandName || "", prefix)
@@ -305,12 +300,13 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
                 createMessageSyntaxError(commandName);
                 const getText2 = createGetText2(langCode, `${process.cwd()}/languages/cmds/${langCode}.js`, prefix, command);
+                // Utilisation de la fonction déjà existante dans parameters
                 await command.onStart({
                     ...parameters,
                     args,
                     commandName,
                     getLang: getText2,
-                    removeCommandNameFromBody
+                    removeCommandNameFromBody: parameters.removeCommandNameFromBody
                 });
                 timestamps[senderID] = dateNow;
                 log.info("CALL COMMAND", `${commandName} | ${userData.name} | ${senderID} | ${threadID} | ${args.join(" ")}`);
