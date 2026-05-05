@@ -18,6 +18,7 @@ module.exports = function (defaultFuncs, api, ctx) {
   function uploadAttachment(attachments, callback) {
     var uploads = [];
 
+    // create an array of promises
     for (var i = 0; i < attachments.length; i++) {
       if (!utils.isReadableStream(attachments[i])) {
         throw {
@@ -47,11 +48,14 @@ module.exports = function (defaultFuncs, api, ctx) {
               throw resData;
             }
 
+            // We have to return the data unformatted unless we want to change it
+            // back in sendMessage.
             return resData.payload.metadata[0];
           })
       );
     }
 
+    // resolve all promises
     Promise.all(uploads)
       .then(function (resData) {
         callback(null, resData);
@@ -94,6 +98,11 @@ module.exports = function (defaultFuncs, api, ctx) {
   }
 
   function sendContent(form, threadID, isSingleUser, messageAndOTID, callback) {
+    // There are three cases here:
+    // 1. threadID is of type array, where we're starting a new group chat with users
+    //    specified in the array.
+    // 2. User is sending a message to a specific user.
+    // 3. No additional form params and the message goes to an existing group chat.
     if (utils.getType(threadID) === "Array") {
       for (var i = 0; i < threadID.length; i++) {
         form["specific_to_list[" + i + "]"] = "fbid:" + threadID[i];
@@ -102,6 +111,8 @@ module.exports = function (defaultFuncs, api, ctx) {
       form["client_thread_id"] = "root:" + messageAndOTID;
       utils.log("sendMessage", "Sending message to multiple users: " + threadID);
     } else {
+      // This means that threadID is the id of a user, and the chat
+      // is a single person chat
       if (isSingleUser) {
         form["specific_to_list[0]"] = "fbid:" + threadID;
         form["specific_to_list[1]"] = "fbid:" + ctx.userID;
@@ -161,6 +172,9 @@ module.exports = function (defaultFuncs, api, ctx) {
   }
 
   function send(form, threadID, messageAndOTID, callback, isGroup) {
+    // We're doing a query to this to check if the given id is the id of
+    // a user or of a group chat. The form will be different depending
+    // on that.
     if (utils.getType(threadID) === "Array") {
       sendContent(form, threadID, false, messageAndOTID, callback);
     } else {
@@ -251,8 +265,8 @@ module.exports = function (defaultFuncs, api, ctx) {
 
         files.forEach(function (file) {
           var key = Object.keys(file);
-          var type = key[0];
-          form["" + type + "s"].push(file[type]);
+          var type = key[0]; // image_id, file_id, etc
+          form["" + type + "s"].push(file[type]); // push the id
         });
         cb();
       });
@@ -296,7 +310,7 @@ module.exports = function (defaultFuncs, api, ctx) {
     cb();
   }
 
-  function sendMessage(msg, threadID, callback, replyToMessage, isGroup) {
+  return function sendMessage(msg, threadID, callback, replyToMessage, isGroup) {
     typeof isGroup == "undefined" ? isGroup = null : "";
     if (
       !callback &&
@@ -338,6 +352,7 @@ module.exports = function (defaultFuncs, api, ctx) {
       });
     }
 
+    // Changing this to accomodate an array of users
     if (
       threadIDType !== "Array" &&
       threadIDType !== "Number" &&
@@ -423,90 +438,5 @@ module.exports = function (defaultFuncs, api, ctx) {
     );
 
     return returnPromise;
-  }
-
-  function sendPrivateMessage(msg, userID, callback) {
-    if (!callback) {
-      var resolveFunc = function () { };
-      var rejectFunc = function () { };
-      var returnPromise = new Promise(function (resolve, reject) {
-        resolveFunc = resolve;
-        rejectFunc = reject;
-      });
-      callback = function (err, data) {
-        if (err) return rejectFunc(err);
-        resolveFunc(data);
-      };
-    }
-
-    if (typeof msg === "string") {
-      msg = { body: msg };
-    }
-
-    if (!msg.body) {
-      return callback({ error: "Message body is required" });
-    }
-
-    var messageAndOTID = utils.generateOfflineThreadingID();
-
-    var form = {
-      client: "mercury",
-      action_type: "ma-type:user-generated-message",
-      author: "fbid:" + ctx.userID,
-      timestamp: Date.now(),
-      timestamp_absolute: "Today",
-      timestamp_relative: utils.generateTimestampRelative(),
-      timestamp_time_passed: "0",
-      is_unread: false,
-      is_cleared: false,
-      is_forward: false,
-      is_filtered_content: false,
-      is_filtered_content_bh: false,
-      is_filtered_content_account: false,
-      is_filtered_content_quasar: false,
-      is_filtered_content_invalid_app: false,
-      is_spoof_warning: false,
-      source: "source:chat:web",
-      "source_tags[0]": "source:chat",
-      body: msg.body.toString(),
-      html_body: false,
-      ui_push_phase: "V3",
-      status: "0",
-      offline_threading_id: messageAndOTID,
-      message_id: messageAndOTID,
-      threading_id: utils.generateThreadingID(ctx.clientID),
-      "ephemeral_ttl_mode:": "0",
-      manual_retry_cnt: "0",
-      has_attachment: !!(msg.attachment || msg.url || msg.sticker),
-      signatureID: utils.getSignatureID(),
-      replied_to_message_id: "",
-      specific_to_list[0]: "fbid:" + userID,
-      specific_to_list[1]: "fbid:" + ctx.userID,
-      other_user_fbid: userID
-    };
-
-    defaultFuncs
-      .post("https://www.facebook.com/messaging/send/", ctx.jar, form)
-      .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
-      .then(function (resData) {
-        if (!resData) {
-          return callback({ error: "Send private message failed." });
-        }
-        if (resData.error) {
-          return callback(resData);
-        }
-        return callback(null, resData);
-      })
-      .catch(function (err) {
-        utils.error("sendPrivateMessage", err);
-        return callback(err);
-      });
-
-    return returnPromise;
-  }
-
-  return {
-    sendMessage,
-    sendPrivateMessage
   };
 };
