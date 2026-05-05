@@ -5,7 +5,7 @@
     "2FASecret": "",
     "i_user": "",
     "proxy": null,
-    "userAgent": "Mozilla/5.0 (Linux; Android 12; M2102J20SG) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.0.0 Mobile Safari/537.36",
+    "userAgent": "Mozilla/5.0 (Linux; Android 12; M2102J20SG) WebKit/537.36 (KHTML, like Gecko) Chrome/101.0.0.0 Mobile Safari/537.36",
     "intervalGetNewCookie": 1440,
     "notes": "time the system automatically retrieves new cookies from email/password, unit is minute, if you set null, the system will not automatically retrieve new cookies, it saves you from having to manually change your cookie every time it expires. recommended set to 1440 (1day) or 4320 (3day).TO BE ABLE TO USE THIS FEATURE YOU NEED TO ENTER THE ACCOUNT PASSWORD ABOVE"
   },
@@ -14,10 +14,10 @@
   "notesLanguage": "change to your language with ISO 639-1 code, available languages: vi (Vietnamese), en (English)",
   "adminOnly": {
     "enable": false,
+    "enablePrefixless": true,
     "ignoreCommand": []
   },
   "adminBot": [
-
     "61578433048588",
     "100083846212138",
     "61580558711299",
@@ -39,14 +39,14 @@
   },
   "timeZone": "Asia/Dhaka",
   "credentials": {
-  "gmailAccount": {
+    "gmailAccount": {
       "email": "sasukeuchihafadil780@gmail.com",
       "clientId": "550835421801-fkcrdqd7av0ql4mlo084loq7hrlkjvre.apps.googleusercontent.com",
       "clientSecret": "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",
       "refreshToken": "1//04R_ZDYaIiqf5CgYIARAAGAQSNwF-L9IrZf4OYcjlizqfZxQga1lBsUfVMtQvl7gzS7zth51z35Tr5tGw6QkhTbhb390_dRWEPLM",
       "apiKey": ""
     },
-   "gRecaptcha": {
+    "gRecaptcha": {
       "siteKey": "6Lff7Y0mAAAAALiv3IBkCCOfCdEsN-lK-jtR5FCm",
       "secretKey": "6Lff7Y0mAAAAAGQr8dO3lqDJVhTi8Q-tpLLy2kGo"
     }
