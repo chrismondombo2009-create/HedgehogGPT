@@ -208,7 +208,7 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
         let isUserCallCommand = false;
 
-        // ---------- CORRECTION : ON START AVEC OU SANS PREFIX ----------
+        // ========== onStart (version corrigée) ==========
         async function onStart() {
             const enablePrefixless = config.adminOnly?.enablePrefixless || false;
 
@@ -240,50 +240,21 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
             if (command) commandName = command.config.name;
 
-            function removeCommandNameFromBody(body_, prefix_, commandName_) {
-                if (arguments.length) {
-                    if (typeof body_ != "string")
-                        throw new Error(`The first argument (body) must be a string, but got "${getType(body_)}"`);
-                    if (typeof prefix_ != "string")
-                        throw new Error(`The second argument (prefix) must be a string, but got "${getType(prefix_)}"`);
-                    if (typeof commandName_ != "string")
-                        throw new Error(`The third argument (commandName) must be a string, but got "${getType(commandName_)}"`);
-                    return body_.replace(new RegExp(`^${prefix_}(\\s+|)${commandName_}`, "i"), "").trim();
-                } else {
-                    return body.replace(new RegExp(`^${prefix}(\\s+|)${commandName}`, "i"), "").trim();
-                }
-            }
-
-            if (isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, commandName, message, langCode))
-                return;
-
+            // ----- IGNORER LES COMMANDES INCONNUES EN MODE SANS PRÉFIXE -----
             if (!command) {
+                if (!body.startsWith(prefix) && enablePrefixless) {
+                    // Aucune commande trouvée et l'utilisateur n'a pas utilisé le préfixe → on ignore
+                    return;
+                }
+                // Mode préfixe : comportement normal (message d'erreur)
                 if (!hideNotiMessage.commandNotFound) {
-                    const allCommands = Array.from(GoatBot.commands.keys());
-                    let closestCommand = null;
-                    let minDistance = 999;
-                    const distanceThreshold = 2;
-
-                    if (commandName) {
-                        for (const correctCommand of allCommands) {
-                            const distance = leven(commandName.toLowerCase(), correctCommand.toLowerCase());
-                            if (distance < minDistance && distance <= distanceThreshold) {
-                                minDistance = distance;
-                                closestCommand = correctCommand;
-                            }
-                        }
-                    }
-
-                    if (closestCommand) {
+                    // Pour éviter l'erreur de traduction manquante, on utilise un fallback simple
+                    try {
                         return await message.reply(
-                            utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFoundSuggestion", closestCommand, prefix)
+                            utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound", commandName || "", prefix)
                         );
-                    } else {
-                        return await message.reply(
-                            commandName ?
-                                utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound", commandName, prefix) :
-                                utils.getText({ lang: langCode, head: "handlerEvents" }, "commandNotFound2", prefix)
-                        );
+                    } catch (e) {
+                        return await message.reply(`❌ Commande "${commandName}" introuvable. Tapez ${prefix}help pour la liste.`);
                     }
                 } else {
                     return true;
@@ -349,8 +320,7 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
             }
         }
 
-        // ----- FIN DE LA CORRECTION -----
-
+        // ========== onChat (inchangé) ==========
         async function onChat() {
             const allOnChat = GoatBot.onChat || [];
             const args = body ? body.split(/ +/) : [];
