@@ -217,12 +217,19 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
             let commandName, args;
             if (body.startsWith(prefix)) {
                 args = body.slice(prefix.length).trim().split(/ +/);
-                commandName = args.shift().toLowerCase();
+                commandName = args.shift()?.toLowerCase() || "";
             } else if (enablePrefixless) {
                 args = body.trim().split(/ +/);
-                commandName = args.shift().toLowerCase();
+                commandName = args.shift()?.toLowerCase() || "";
             } else {
                 return;
+            }
+
+            // ----- Si l'utilisateur tape uniquement le préfixe (ou préfixe + espaces) -----
+            if (body.startsWith(prefix) && commandName === "") {
+                const replyText = utils.getText({ lang: langCode, head: "handlerEvents" }, "prefixInfo", prefix)
+                                || `🔹 Préfixe actuel : ${prefix}\n🔹 Tape ${prefix}help pour voir les commandes.`;
+                return message.reply(replyText);
             }
 
             const dateNow = Date.now();
@@ -300,7 +307,6 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 
                 createMessageSyntaxError(commandName);
                 const getText2 = createGetText2(langCode, `${process.cwd()}/languages/cmds/${langCode}.js`, prefix, command);
-                // Utilisation de la fonction déjà existante dans parameters
                 await command.onStart({
                     ...parameters,
                     args,
