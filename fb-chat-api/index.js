@@ -1,19 +1,3 @@
-/**
- * HedgehogGPT — Facebook Chat API
- *
- * Merged and fixed from multiple open-source FCA forks.
- * Key fixes applied on top of base:
- *   - fb_dtsg extraction: 8 regex patterns + cheerio fallback (fixes broken DMs)
- *   - getFreshDtsg(): renews fb_dtsg token without restarting the bot
- *   - MQTT: keepalive 10s, connectTimeout 10s, reconnectPeriod 1s (was 60/none/3)
- *   - stopListenMqtt: clean WebSocket teardown
- *   - parseMentions(): multi-format mention parser (prng / tags_metadata / profile_xmd)
- *   - getMessage: fixed .length.map() TypeError on blob_attachments
- *   - sendMessageMqtt: removed debug console.logs and crash on missing global
- *
- * Original authors: Avery, David, Maude, Benjamin, UIRI, NTKhang, NethWs3Dev, DongDev
- * License: MIT
- */
 "use strict";
 
 var utils = require("./utils");
@@ -25,6 +9,7 @@ var { cra, cv, cb, co } = getThemeColors();*/
 log.maxRecordSize = 100;
 var checkVerified = null;
 const Boolean_Option = ['online', 'selfListen', 'listenEvents', 'updatePresence', 'forceLogin', 'autoMarkDelivery', 'autoMarkRead', 'listenTyping', 'autoReconnect', 'emitReady'];
+global.ditconmemay = false;
 
 function setOptions(globalOptions, options) {
     Object.keys(options).map(function (key) {
@@ -129,9 +114,10 @@ function buildAPI(globalOptions, html, jar) {
                 }
             } catch { }
             if (fb_dtsg) {
-                            }
+                console.log("Đã tìm thấy fb_dtsg");
+            }
         } catch (e) {
-            log.warn("login", "Could not extract fb_dtsg:", e);
+            console.log("Lỗi khi tìm fb_dtsg:", e);
         }
     }
     extractFromHTML();
@@ -154,14 +140,19 @@ function buildAPI(globalOptions, html, jar) {
 
     try {
         const endpointMatch = html.match(/"endpoint":"([^"]+)"/);
+        if (endpointMatch.input.includes("601051028565049")) {
+          console.log(`lỗi login vì dính tài khoản tự động`);
+          ditconmemay = true;
+        }
         if (endpointMatch) {
             mqttEndpoint = endpointMatch[1].replace(/\\\//g, '/');
             const url = new URL(mqttEndpoint);
             region = url.searchParams.get('region')?.toUpperCase() || "PRN";
         }
     } catch (e) {
-        log.warn('login', 'Could not parse MQTT endpoint, using default.');
+        console.log('Using default MQTT endpoint');
     }
+    log.info('login', 'Fix fca by DongDev x Satoru, published By Team Calyx');
     var ctx = {
         userID: userID,
         jar: jar,
@@ -223,7 +214,7 @@ function buildAPI(globalOptions, html, jar) {
 
             return newDtsg;
         } catch (e) {
-            log.warn("getFreshDtsg", "Error refreshing fb_dtsg:", e);
+            console.log("Error getting fresh dtsg:", e);
             return null;
         }
     };
@@ -406,7 +397,7 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
 
     mainPromise
         .then(async () => {
-            log.info('login', 'Login successful.');
+            log.info('Đăng nhập thành công');
             callback(null, api);
         })
         .catch(e => {
@@ -425,13 +416,13 @@ function login(loginData, options, callback) {
         selfListen: false,
         listenEvents: true,
         listenTyping: false,
-        updatePresence: true,
+        updatePresence: false,
         forceLogin: false,
-        autoMarkDelivery: true,
-        autoMarkRead: true,
+        autoMarkDelivery: false,
+        autoMarkRead: false,
         autoReconnect: true,
         logRecordSize: 100,
-        online: true,
+        online: false,
         emitReady: false,
         userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
     };
