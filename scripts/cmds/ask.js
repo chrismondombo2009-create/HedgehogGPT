@@ -129,7 +129,7 @@ module.exports = {
 
     const payload = {
       query,
-      key: 'fadil_boss_dev_uchiha',
+      key: 'rodrigue_boss_dev_uchiha',
       name_user: name,
       history: this.conversationHistory[userId].slice(-12),
       uid: userId,
@@ -176,7 +176,7 @@ module.exports = {
       if (data.generated_image && data.generated_image.url) {
         try {
           let imageUrl = data.generated_image.url;
-          
+
           if (imageUrl.startsWith('data:image/')) {
             const base64Data = imageUrl.split(',')[1];
             const imageBuffer = Buffer.from(base64Data, 'base64');
