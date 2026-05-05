@@ -1,3 +1,19 @@
+/**
+ * HedgehogGPT — Facebook Chat API
+ *
+ * Merged and fixed from multiple open-source FCA forks.
+ * Key fixes applied on top of base:
+ *   - fb_dtsg extraction: 8 regex patterns + cheerio fallback (fixes broken DMs)
+ *   - getFreshDtsg(): renews fb_dtsg token without restarting the bot
+ *   - MQTT: keepalive 10s, connectTimeout 10s, reconnectPeriod 1s (was 60/none/3)
+ *   - stopListenMqtt: clean WebSocket teardown
+ *   - parseMentions(): multi-format mention parser (prng / tags_metadata / profile_xmd)
+ *   - getMessage: fixed .length.map() TypeError on blob_attachments
+ *   - sendMessageMqtt: removed debug console.logs and crash on missing global
+ *
+ * Original authors: Avery, David, Maude, Benjamin, UIRI, NTKhang, NethWs3Dev, DongDev
+ * License: MIT
+ */
 "use strict";
 
 var utils = require("./utils");
@@ -9,7 +25,6 @@ var { cra, cv, cb, co } = getThemeColors();*/
 log.maxRecordSize = 100;
 var checkVerified = null;
 const Boolean_Option = ['online', 'selfListen', 'listenEvents', 'updatePresence', 'forceLogin', 'autoMarkDelivery', 'autoMarkRead', 'listenTyping', 'autoReconnect', 'emitReady'];
-global.ditconmemay = false;
 
 function setOptions(globalOptions, options) {
     Object.keys(options).map(function (key) {
@@ -114,10 +129,9 @@ function buildAPI(globalOptions, html, jar) {
                 }
             } catch { }
             if (fb_dtsg) {
-                console.log("Đã tìm thấy fb_dtsg");
-            }
+                            }
         } catch (e) {
-            console.log("Lỗi khi tìm fb_dtsg:", e);
+            log.warn("login", "Could not extract fb_dtsg:", e);
         }
     }
     extractFromHTML();
@@ -131,7 +145,14 @@ function buildAPI(globalOptions, html, jar) {
     if (html.includes("/checkpoint/block/?next")) {
         return log.error('login', "Appstate die, vui lòng thay cái mới!", 'error');
     }
-    userID = (tiktikCookie || userCookie).cookieString().split("=")[1];
+    // Always use c_user as the primary userID for MQTT routing.
+    // i_user (TikTok-linked or secondary account) is stored separately
+    // and used only for HTTP request signing — NOT for MQTT identity.
+    // Using i_user for MQTT causes Facebook to route private messages
+    // to the wrong stream, so DMs are never delivered.
+    const c_userID = userCookie ? userCookie.cookieString().split("=")[1] : null;
+    const i_userID = tiktikCookie ? tiktikCookie.cookieString().split("=")[1] : null;
+    userID = c_userID || i_userID;
     //logger.log(`${cra(`[ CONNECT ]`)} Logged in as ${userID}`, "DATABASE");
     try { clearInterval(checkVerified); } catch (_) { }
     const clientID = (Math.random() * 2147483648 | 0).toString(16);
@@ -140,21 +161,17 @@ function buildAPI(globalOptions, html, jar) {
 
     try {
         const endpointMatch = html.match(/"endpoint":"([^"]+)"/);
-        if (endpointMatch.input.includes("601051028565049")) {
-          console.log(`lỗi login vì dính tài khoản tự động`);
-          ditconmemay = true;
-        }
         if (endpointMatch) {
             mqttEndpoint = endpointMatch[1].replace(/\\\//g, '/');
             const url = new URL(mqttEndpoint);
             region = url.searchParams.get('region')?.toUpperCase() || "PRN";
         }
     } catch (e) {
-        console.log('Using default MQTT endpoint');
+        log.warn('login', 'Could not parse MQTT endpoint, using default.');
     }
-    log.info('login', 'Fix fca by DongDev x Satoru, published By Team Calyx');
     var ctx = {
-        userID: userID,
+        userID: userID,       // c_user — used for MQTT identity
+        i_userID: i_userID,   // i_user — used for HTTP request signing only
         jar: jar,
         clientID: clientID,
         globalOptions: globalOptions,
@@ -214,12 +231,14 @@ function buildAPI(globalOptions, html, jar) {
 
             return newDtsg;
         } catch (e) {
-            console.log("Error getting fresh dtsg:", e);
+            log.warn("getFreshDtsg", "Error refreshing fb_dtsg:", e);
             return null;
         }
     };
     //if (noMqttData) api.htmlData = noMqttData;
-    require('fs').readdirSync(__dirname + '/src/').filter(v => v.endsWith('.js')).forEach(v => { api[v.replace('.js', '')] = require(`./src/${v}`)(utils.makeDefaults(html, userID, ctx), api, ctx); });
+    // Use i_userID for HTTP request signing if available (matches original behaviour)
+    const httpUserID = i_userID || userID;
+    require('fs').readdirSync(__dirname + '/src/').filter(v => v.endsWith('.js')).forEach(v => { api[v.replace('.js', '')] = require(`./src/${v}`)(utils.makeDefaults(html, httpUserID, ctx), api, ctx); });
     api.listen = api.listenMqtt;
     return {
         ctx,
@@ -397,7 +416,7 @@ function loginHelper(appState, email, password, globalOptions, callback, prCallb
 
     mainPromise
         .then(async () => {
-            log.info('Đăng nhập thành công');
+            log.info('login', 'Login successful.');
             callback(null, api);
         })
         .catch(e => {
