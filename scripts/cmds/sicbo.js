@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { createCanvas } = require("canvas");
 const axios = require("axios");
+const { getUsername } = require("../../utils/getUsername");
 
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
 const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
@@ -191,19 +192,13 @@ function evaluateBet(betType, betValue, dice) {
 
 function getPayout(betType, betValue, dice) {
     const sum = dice[0] + dice[1] + dice[2];
-
     const payouts = {
-        petit: 3,
-        grand: 3,
+        petit: 3, grand: 3,
         total: { 4: 60, 5: 30, 6: 18, 7: 12, 8: 8, 9: 7, 10: 6, 11: 6, 12: 7, 13: 8, 14: 12, 15: 18, 16: 30, 17: 60 },
-        triple_any: 6,
-        triple_specific: 6,
-        double_any: 3,
-        double_specific: 3,
-        simple: 3,
-        combo: 7
+        triple_any: 6, triple_specific: 6,
+        double_any: 3, double_specific: 3,
+        simple: 3, combo: 7
     };
-
     if (betType === "total") return payouts.total[sum] || 0;
     if (betType === "triple") return payouts.triple_any;
     if (betType === "double") return payouts.double_any;
@@ -303,15 +298,11 @@ async function generateSicboCard(username, betDisplay, amount, win, winAmount, n
     ctx.fillText(`${formatNumber(newBalance)}$`, 30, 370);
     ctx.fillStyle = "#aaa";
     ctx.font = "10px 'Courier New'";
-    ctx.fillText("NOUVEAU SOLDE", 30, 395);
+    ctx.fillText("NOUVEAU SOLDE", 30, 390);
 
     ctx.fillStyle = "#aaa";
     ctx.font = "bold 11px 'Courier New'";
-    ctx.fillText(`Tours restants: ${remainingSpins}/15`, 30, 395);
-
-    ctx.fillStyle = "#fff";
-    ctx.font = "20px 'Courier New'";
-    ctx.fillText("📡", 540, 380);
+    ctx.fillText(`Tours restants: ${remainingSpins}/15`, 400, 370);
 
     const date = new Date();
     const dateStr = `${date.getDate()}/${date.getMonth()+1}/${date.getFullYear()}`;
@@ -332,21 +323,21 @@ module.exports = {
         category: "game"
     },
 
-    onStart: async function ({ args, message, event, api }) {
+    onStart: async function ({ args, message, event, api, usersData }) {
         const { senderID } = event;
         const userMoney = await getUserCash(senderID);
         const subCommand = args[0];
 
         const bankPath = "./bank.json";
         let bankData = {};
-
         if (fs.existsSync(bankPath)) {
             bankData = JSON.parse(fs.readFileSync(bankPath, "utf8"));
         }
 
         const userBank = bankData[senderID] || { bank: 0, imageMode: true };
-        const userInfo = await api.getUserInfo(senderID);
-        const username = userInfo[senderID].name;
+
+        // ✅ Fix
+        const username = await getUsername(senderID, api, usersData);
 
         if (args[0]?.toLowerCase() === "stats") {
             const stats = getRemainingSpins(senderID);
@@ -394,12 +385,10 @@ module.exports = {
             const lastBonus = userData?.lastBonus || 0;
             const now = Date.now();
             const dayMs = 86400000;
-
             if (now - lastBonus < dayMs) {
                 const remaining = Math.ceil((dayMs - (now - lastBonus)) / 3600000);
                 return message.reply(`𝐁𝐨𝐧𝐮𝐬 𝐝𝐞𝐣𝐚̀ 𝐫𝐞𝐜𝐮 !\n⏳ 𝐏𝐫𝐨𝐜𝐡𝐚𝐢𝐧 𝐛𝐨𝐧𝐮𝐬 𝐝𝐚𝐧𝐬 ${remaining}𝐡`);
             }
-
             await updateUserCash(senderID, 200);
             const newBalance = await getUserCash(senderID);
             return message.reply(`🎁 𝐁𝐨𝐧𝐮𝐬 𝐪𝐮𝐨𝐭𝐢𝐝𝐢𝐞𝐧 !\n━━━━━━━━━━━━━━━━\n✨ +𝟐𝟎𝟎$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`);
@@ -418,7 +407,6 @@ module.exports = {
         }
 
         const betType = subCommand;
-
         let amount = await parseAmountWithSuffix(args[1]);
 
         if (amount === null || isNaN(amount) || amount <= 0) {
@@ -435,7 +423,7 @@ module.exports = {
         }
 
         let betValue = null;
-        let validTypes = ["petit", "grand", "total", "triple", "double", "simple", "combo"];
+        const validTypes = ["petit", "grand", "total", "triple", "double", "simple", "combo"];
 
         if (!validTypes.includes(betType)) {
             return message.reply(`❌ 𝐓𝐲𝐩𝐞 𝐝𝐞 𝐩𝐚𝐫𝐢 𝐢𝐧𝐜𝐨𝐧𝐧𝐮\n\n➜ 𝐬𝐢𝐜𝐛𝐨 𝐡𝐞𝐥𝐩 𝐩𝐨𝐮𝐫 𝐯𝐨𝐢𝐫 𝐥𝐚 𝐥𝐢𝐬𝐭𝐞`);
@@ -482,7 +470,6 @@ module.exports = {
         const isTriple = dice[0] === dice[1] && dice[1] === dice[2];
 
         const randomWin = Math.random() < 0.85;
-
         let win = false;
         let payout = 0;
         let winAmount = 0;
@@ -490,16 +477,8 @@ module.exports = {
         if (randomWin) {
             win = true;
             const baseWin = evaluateBet(betType, betValue, dice);
-            if (baseWin) {
-                payout = getPayout(betType, betValue, dice);
-            } else {
-                payout = 3;
-            }
+            payout = baseWin ? getPayout(betType, betValue, dice) : 3;
             winAmount = amount * payout;
-        } else {
-            win = false;
-            payout = 0;
-            winAmount = 0;
         }
 
         let newBalance;
@@ -518,17 +497,11 @@ module.exports = {
         else if (betType === "combo") betDisplay = `𝐂𝐨𝐦𝐛𝐢𝐧𝐚𝐢𝐬𝐨𝐧 ${betValue[0]}+${betValue[1]}`;
         else betDisplay = betType === "petit" ? "𝐏𝐞𝐭𝐢𝐭 (𝟒-𝟏𝟎)" : "𝐆𝐫𝐚𝐧𝐝 (𝟏𝟏-𝟏𝟕)";
 
-        let resultMsg = "";
-        if (win) {
-            resultMsg = `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n━━━━━━━━━━━━━━━━\n✨ 𝐆𝐚𝐢𝐧 : +${formatNumber(winAmount)}$ (𝐱${payout})\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
-        } else {
-            resultMsg = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 𝐏𝐞𝐫𝐭𝐞 : -${formatNumber(amount)}$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
-        }
+        let resultMsg = win
+            ? `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n━━━━━━━━━━━━━━━━\n✨ 𝐆𝐚𝐢𝐧 : +${formatNumber(winAmount)}$ (𝐱${payout})\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`
+            : `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 𝐏𝐞𝐫𝐭𝐞 : -${formatNumber(amount)}$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
 
-        let tripleInfo = "";
-        if (isTriple) {
-            tripleInfo = `\n━━━━━━━━━━━━━━━━\n🎲 𝐓𝐑𝐈𝐏𝐋𝐄 ! ${dice[0]} ${dice[0]} ${dice[0]}`;
-        }
+        let tripleInfo = isTriple ? `\n━━━━━━━━━━━━━━━━\n🎲 𝐓𝐑𝐈𝐏𝐋𝐄 ! ${dice[0]} ${dice[0]} ${dice[0]}` : "";
 
         await message.reply(
 `☘️ 𝐒𝐈𝐂 𝐁𝐎 - 𝐑𝐄́𝐒𝐔𝐋𝐓𝐀𝐓 ☘️
