@@ -4,12 +4,51 @@ const axios = require("axios");
 
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
 const BANK_API_URL = "https://bank-save-production.up.railway.app/api/bank";
+const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
+
+function toBigInt(value) {
+  if (typeof value === 'bigint') return value;
+  if (value === undefined || value === null) return 0n;
+  try {
+    return BigInt(String(value));
+  } catch {
+    return 0n;
+  }
+}
+
+function formatBigInt(num) {
+  if (num === 0n) return "0";
+  const suffixes = ["", "k", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+  let i = 0;
+  let scaled = num;
+  const thousand = 1000n;
+  while (scaled >= thousand && i < suffixes.length - 1) {
+    scaled = scaled / thousand;
+    i++;
+  }
+  const integerPart = scaled;
+  const remainder = (num % (thousand ** BigInt(i))) / (thousand ** BigInt(i - 1));
+  if (remainder > 0n) {
+    return `${integerPart}.${remainder}${suffixes[i]}`;
+  }
+  return `${integerPart}${suffixes[i]}`;
+}
+
+async function formatNumberWithAPI(num) {
+  try {
+    const response = await axios.get(`${CONVERT_API_URL}?number=${num.toString()}`);
+    if (response.data && response.data.success) return response.data.formatted;
+  } catch (error) {
+    console.error("Convert API Error:", error.message);
+  }
+  return formatBigInt(toBigInt(num));
+}
 
 module.exports = {
   config: {
     name: "balance",
     aliases: ["bal"],
-    version: "2.2",
+    version: "2.4",
     author: "NTKhang, updated by Itachi Soma",
     countDown: 5,
     role: 0,
@@ -37,42 +76,52 @@ module.exports = {
     }
   },
 
-  onStart: async function ({ message, event, getLang, api }) {
-    function formatNumber(num) {
-      if (num === null || num === undefined || isNaN(num)) return "0";
-      if (num >= 1000000000000) {
-        return (num / 1000000000000).toFixed(1).replace(/\.0$/, '') + 'T';
-      }
-      if (num >= 1000000000) {
-        return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
-      }
-      if (num >= 1000000) {
-        return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-      }
-      if (num >= 1000) {
-        return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-      }
-      return num.toString();
+  onStart: async function ({ message, event, getLang, api, usersData }) {
+
+    async function getUsername(uid) {
+      try {
+        const info = await api.getUserInfo(uid);
+        const name = info?.name || info?.[uid]?.name;
+        if (name && name !== uid && name !== "Facebook User" && !name.startsWith("User_")) {
+          return name;
+        }
+      } catch (e) {}
+      try {
+        const localName = await usersData.getName(uid);
+        if (localName && localName !== uid && localName !== "Facebook User") {
+          return localName;
+        }
+      } catch (e) {}
+      return `User_${String(uid).slice(-5)}`;
     }
 
     async function getUserCash(userId) {
       try {
         const response = await axios.get(`${CASH_API_URL}/${userId}`);
-        if (response.data.success) return response.data.data.cash;
+        if (response.data.success) {
+          const cashStr = response.data.data.cash; 
+          return toBigInt(cashStr);
+        }
       } catch (error) {
         console.error("Cash API Error:", error.message);
       }
-      return 0;
+      return 0n;
     }
 
     async function getUserBankData(userId) {
       try {
         const response = await axios.get(`${BANK_API_URL}/${userId}`);
-        if (response.data.success) return response.data.data;
+        if (response.data.success) {
+          const bankStr = response.data.data.bank; // string
+          return {
+            bank: toBigInt(bankStr || "0"),
+            card: response.data.data.card || null
+          };
+        }
       } catch (error) {
         console.error("Bank API Error:", error.message);
       }
-      return { bank: 0, card: null };
+      return { bank: 0n, card: null };
     }
 
     async function generateBalanceCard(userInfo, bankData, cashMoney) {
@@ -98,6 +147,7 @@ module.exports = {
       ctx.fillStyle = "#aaa";
       ctx.fillText("PREMIUM CARD", 25, 75);
 
+      // Avatar
       try {
         const avatarUrl = userInfo.thumbSrc || `https://graph.facebook.com/${userInfo.userID}/picture?width=100&height=100`;
         const avatar = await loadImage(avatarUrl);
@@ -128,10 +178,10 @@ module.exports = {
       ctx.fillStyle = "#d4af37";
       ctx.fillRect(25, 95, 50, 40);
 
+      const cardNumberStr = bankData.card?.cardNumber || "4532 **** **** 5772";
       ctx.fillStyle = "#e0e0e0";
       ctx.font = "22px 'Courier New'";
-      const cardNumber = bankData.card?.cardNumber || "4532 **** **** 5772";
-      ctx.fillText(cardNumber, 90, 125);
+      ctx.fillText(cardNumberStr, 90, 125);
 
       ctx.fillStyle = "#aaa";
       ctx.font = "11px 'Courier New'";
@@ -167,28 +217,28 @@ module.exports = {
       ctx.font = "bold 14px 'Courier New'";
       ctx.fillText("SOLDES", 290, 230);
 
+      const bankBalance = bankData.bank;
+      const formattedBank = await formatNumberWithAPI(bankBalance);
+      const formattedCash = await formatNumberWithAPI(cashMoney);
+      const formattedTotal = await formatNumberWithAPI(bankBalance + cashMoney);
+
       ctx.fillStyle = "#00ff88";
       ctx.font = "bold 14px 'Courier New'";
       ctx.fillText(`Bancaire`, 290, 262);
-      const bankBalance = bankData.bank || 0;
       ctx.fillStyle = "#00ff88";
-      ctx.font = "bold 14px 'Courier New'";
-      ctx.fillText(`${formatNumber(bankBalance)}$`, 450, 262);
+      ctx.fillText(`${formattedBank}$`, 450, 262);
 
       ctx.fillStyle = "#ffd700";
       ctx.font = "bold 14px 'Courier New'";
       ctx.fillText(`Liquide`, 290, 290);
       ctx.fillStyle = "#ffd700";
-      ctx.font = "bold 14px 'Courier New'";
-      ctx.fillText(`${formatNumber(cashMoney)}$`, 450, 290);
+      ctx.fillText(`${formattedCash}$`, 450, 290);
 
       ctx.fillStyle = "#d4af37";
       ctx.font = "bold 14px 'Courier New'";
       ctx.fillText(`Total`, 290, 320);
-      const totalMoney = bankBalance + cashMoney;
       ctx.fillStyle = "#d4af37";
-      ctx.font = "bold 14px 'Courier New'";
-      ctx.fillText(`${formatNumber(totalMoney)}$`, 450, 320);
+      ctx.fillText(`${formattedTotal}$`, 450, 320);
 
       const date = new Date();
       const dateStr = `${date.getDate()}/${date.getMonth()+1}/${date.getFullYear()}`;
@@ -203,12 +253,17 @@ module.exports = {
       const uids = Object.keys(event.mentions);
       for (const uid of uids) {
         const userMoney = await getUserCash(uid);
-        const userInfo = await api.getUserInfo(uid);
         const bankData = await getUserBankData(uid);
-        const username = userInfo[uid]?.name || event.mentions[uid].replace("@", "");
+        const username = await getUsername(uid);
+
+        let userInfoRaw = {};
+        try {
+          userInfoRaw = await api.getUserInfo(uid);
+        } catch(e) {}
+        const thumbSrc = userInfoRaw?.[uid]?.thumbSrc || userInfoRaw?.thumbSrc;
 
         const img = await generateBalanceCard(
-          { userID: uid, name: username, thumbSrc: userInfo[uid]?.thumbSrc },
+          { userID: uid, name: username, thumbSrc },
           bankData,
           userMoney
         );
@@ -216,9 +271,9 @@ module.exports = {
         const imgPath = `./balance_${uid}.png`;
         fs.writeFileSync(imgPath, img);
 
-        const textMsg = getLang("moneyOf", username, formatNumber(userMoney));
+        const formattedMoney = await formatNumberWithAPI(userMoney);
         await message.reply({
-          body: textMsg,
+          body: getLang("moneyOf", username, formattedMoney),
           attachment: fs.createReadStream(imgPath)
         });
 
@@ -229,12 +284,17 @@ module.exports = {
 
     const uid = event.senderID;
     const userMoney = await getUserCash(uid);
-    const userInfo = await api.getUserInfo(uid);
     const bankData = await getUserBankData(uid);
-    const username = userInfo[uid]?.name || "Utilisateur";
+    const username = await getUsername(uid);
+
+    let userInfoRaw = {};
+    try {
+      userInfoRaw = await api.getUserInfo(uid);
+    } catch(e) {}
+    const thumbSrc = userInfoRaw?.[uid]?.thumbSrc || userInfoRaw?.thumbSrc;
 
     const img = await generateBalanceCard(
-      { userID: uid, name: username, thumbSrc: userInfo[uid]?.thumbSrc },
+      { userID: uid, name: username, thumbSrc },
       bankData,
       userMoney
     );
@@ -242,9 +302,9 @@ module.exports = {
     const imgPath = `./balance_${uid}.png`;
     fs.writeFileSync(imgPath, img);
 
-    const textMsg = getLang("money", formatNumber(userMoney));
+    const formattedMoney = await formatNumberWithAPI(userMoney);
     await message.reply({
-      body: textMsg,
+      body: getLang("money", formattedMoney),
       attachment: fs.createReadStream(imgPath)
     });
 
