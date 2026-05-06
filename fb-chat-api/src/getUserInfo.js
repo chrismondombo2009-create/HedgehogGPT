@@ -9,11 +9,10 @@ module.exports = function (defaultFuncs, api, ctx) {
             throw new Error("No user ID provided");
         }
 
-        // Normalisation : on accepte un seul ID ou un tableau d'IDs
         const isMultiple = Array.isArray(userID);
         const ids = isMultiple ? userID : [userID];
 
-        // --- Étape 1 : essayer l'API Facebook (batch) ---
+        // --- 1. Essayer l’API Facebook (batch) ---
         let graphResult = {};
         try {
             const requests = ids.map(id => ({
@@ -45,37 +44,36 @@ module.exports = function (defaultFuncs, api, ctx) {
             log.warn("getUserInfo", "Facebook batch request failed, will use local cache.");
         }
 
-        // --- Étape 2 : compléter avec la base locale usersData ---
+        // --- 2. Compléter avec la base locale usersData ---
         const resultObj = {};
         for (const id of ids) {
-            // Si l'API Facebook a renvoyé un nom valide, on le garde
-            if (graphResult[id] && graphResult[id].name && graphResult[id].name !== "Facebook User") {
-                resultObj[id] = graphResult[id];
-                continue;
-            }
+            const fbData = graphResult[id] || {};
+            let name = fbData.name;
 
-            // Sinon, on essaie de récupérer le nom depuis usersData
-            let localName = null;
-            try {
-                // On accède à usersData via l'objet global (disponible dans tout le processus du bot)
-                const usersData = global.GoatBot?.usersData || global.usersData;
-                if (usersData) {
-                    localName = await usersData.getName(id);
+            // Si le nom Facebook est absent ou semble être un ID, on utilise usersData
+            if (!name || name === id || name === "Facebook User") {
+                let localName = null;
+                try {
+                    const usersData = global.GoatBot?.usersData || global.usersData;
+                    if (usersData) {
+                        localName = await usersData.getName(id);
+                    }
+                } catch (e) {}
+
+                // On ne garde que si localName est un vrai nom (pas un ID)
+                if (localName && localName !== id) {
+                    name = localName;
+                } else {
+                    name = "Facebook User";
                 }
-            } catch (e) {}
-
-            // Construction de l'objet final avec le nom trouvé (local ou fallback)
-            resultObj[id] = {
-                id: id,
-                name: localName || "Facebook User",
-                firstName: "Facebook",
-                thumbSrc: `https://graph.facebook.com/${id}/picture?width=100&height=100`,
-                ...(graphResult[id] || {})
-            };
-            // On remplace le nom si on avait un résultat partiel
-            if (localName) {
-                resultObj[id].name = localName;
             }
+
+            resultObj[id] = {
+                ...fbData,
+                id: id,
+                name: name,
+                thumbSrc: fbData.thumbSrc || `https://graph.facebook.com/${id}/picture?width=100&height=100`
+            };
         }
 
         return isMultiple ? resultObj : resultObj[userID];
