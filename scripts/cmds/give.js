@@ -1,6 +1,7 @@
 const fs = require("fs");
 const { createCanvas, loadImage } = require("canvas");
 const axios = require("axios");
+const { getUsername } = require("../../utils/getUsername");
 
 const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
@@ -37,7 +38,7 @@ module.exports = {
         category: "economy"
     },
 
-    onStart: async function ({ args, message, event, api }) {
+    onStart: async function ({ args, message, event, api, usersData }) {
         const { senderID, messageReply } = event;
 
         let targetID;
@@ -45,8 +46,8 @@ module.exports = {
 
         if (messageReply) {
             targetID = messageReply.senderID;
-            const targetInfo = await api.getUserInfo(targetID);
-            targetName = targetInfo[targetID]?.name || "cet utilisateur";
+            // ✅ Fix : utiliser getUsername au lieu de targetInfo[targetID]?.name
+            targetName = await getUsername(targetID, api, usersData);
         } else if (Object.keys(event.mentions).length > 0) {
             targetID = Object.keys(event.mentions)[0];
             targetName = event.mentions[targetID];
@@ -63,11 +64,11 @@ module.exports = {
    → Réponds à son message
 ━━━━━━━━━━━━━━━━
 📝 Exemples :
-1k = 1 000
-2.5k = 2 500
-1M = 1 000 000
-1B = 1 000 000 000
-1T = 1 000 000 000 000
+1k = 1 000
+2.5k = 2 500
+1M = 1 000 000
+1B = 1 000 000 000
+1T = 1 000 000 000 000
 all = tout ton argent`
             );
         }
@@ -81,7 +82,6 @@ all = tout ton argent`
         }
 
         const senderMoney = await getUserCash(senderID);
-        const targetMoney = await getUserCash(targetID);
 
         let amountInput = args[0].toLowerCase();
         let amount;
@@ -118,11 +118,24 @@ all = tout ton argent`
         const icons = ["🎁", "💝", "💸", "🤝", "🎉", "💎", "✨", "🌟"];
         const randomIcon = icons[Math.floor(Math.random() * icons.length)];
 
-        const senderInfo = await api.getUserInfo(senderID);
-        const senderName = senderInfo[senderID].name;
+        // ✅ Fix : utiliser getUsername pour les deux
+        const senderName = await getUsername(senderID, api, usersData);
+        const targetRealName = await getUsername(targetID, api, usersData);
 
-        const targetInfo = await api.getUserInfo(targetID);
-        const targetRealName = targetInfo[targetID].name;
+        // thumbSrc récupéré séparément pour l'image
+        let senderThumb, targetThumb;
+        try {
+            const si = await api.getUserInfo(senderID);
+            senderThumb = si?.thumbSrc || si?.[senderID]?.thumbSrc || `https://graph.facebook.com/${senderID}/picture?width=200&height=200`;
+        } catch (e) {
+            senderThumb = `https://graph.facebook.com/${senderID}/picture?width=200&height=200`;
+        }
+        try {
+            const ti = await api.getUserInfo(targetID);
+            targetThumb = ti?.thumbSrc || ti?.[targetID]?.thumbSrc || `https://graph.facebook.com/${targetID}/picture?width=200&height=200`;
+        } catch (e) {
+            targetThumb = `https://graph.facebook.com/${targetID}/picture?width=200&height=200`;
+        }
 
         await message.reply(
 `${randomIcon} 𝐓𝐑𝐀𝐍𝐒𝐅𝐄𝐑𝐓 𝐑𝐄́𝐔𝐒𝐒𝐈 ${randomIcon}
@@ -133,16 +146,13 @@ all = tout ton argent`
         );
 
         try {
-            const senderAvatarUrl = senderInfo[senderID].thumbSrc || `https://graph.facebook.com/${senderID}/picture?width=200&height=200`;
-            const targetAvatarUrl = targetInfo[targetID].thumbSrc || `https://graph.facebook.com/${targetID}/picture?width=200&height=200`;
-            
             const transferImage = await generateTransferImage(
                 senderName,
                 targetRealName,
                 formattedAmount,
                 randomIcon,
-                senderAvatarUrl,
-                targetAvatarUrl
+                senderThumb,
+                targetThumb
             );
             const imgPath = `./transfer_${senderID}_${targetID}.png`;
             fs.writeFileSync(imgPath, transferImage);
@@ -166,37 +176,29 @@ async function parseAmountWithAPI(input) {
     } catch (error) {
         console.error("API conversion échouée, utilisation du parseur local:", error.message);
     }
-    
+
     const str = input.toString().toLowerCase().replace(/\s/g, '');
     const suffixes = {
-        'k': 1000n,
-        'm': 1000000n,
-        'b': 1000000000n,
-        't': 1000000000000n,
-        'q': 1000000000000000n,
-        'Q': 1000000000000000000n,
-        's': 1000000000000000000000n,
-        'S': 1000000000000000000000000n,
-        'o': 1000000000000000000000000000n,
-        'n': 1000000000000000000000000000000n,
+        'k': 1000n, 'm': 1000000n, 'b': 1000000000n, 't': 1000000000000n,
+        'q': 1000000000000000n, 'Q': 1000000000000000000n,
+        's': 1000000000000000000000n, 'S': 1000000000000000000000000n,
+        'o': 1000000000000000000000000000n, 'n': 1000000000000000000000000000000n,
         'd': 1000000000000000000000000000000000n
     };
-    
+
     const match = str.match(/^(\d+(?:\.\d+)?)([a-z]+)?$/i);
     if (!match) return null;
-    
+
     let value = match[1].includes('.') ? parseFloat(match[1]) : parseInt(match[1]);
     const suffix = (match[2] || '').toLowerCase();
-    
     if (isNaN(value)) return null;
-    
+
     let result;
     if (suffixes[suffix]) {
         result = BigInt(Math.floor(value)) * suffixes[suffix];
     } else {
         result = BigInt(Math.floor(value));
     }
-    
     return Number(result);
 }
 
