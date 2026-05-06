@@ -1,71 +1,83 @@
 "use strict";
 
+const utils = require("../utils");
+const log = require("npmlog");
+
 module.exports = function (defaultFuncs, api, ctx) {
-    // Amélioration 1: Accepter un tableau d'IDs pour faire une requête groupée
-    return async function getUserInfo(userIDs) {
-        if (!userIDs || (Array.isArray(userIDs) && userIDs.length === 0)) {
-            return Promise.reject(new Error("No user IDs provided"));
+    return async function getUserInfo(userID) {
+        if (!userID) {
+            throw new Error("No user ID provided");
         }
 
-        const inputIsArray = Array.isArray(userIDs);
-        const ids = inputIsArray ? userIDs : [userIDs];
+        // Normalisation : on accepte un seul ID ou un tableau d'IDs
+        const isMultiple = Array.isArray(userID);
+        const ids = isMultiple ? userID : [userID];
 
-        // Amélioration 2: Utiliser le batch API de Facebook pour obtenir toutes les infos en une fois
-        const requests = ids.map(id => ({
-            method: "GET",
-            relative_url: `${encodeURIComponent(id)}?fields=id,name,firstName,lastname,thumbSrc,profileUrl,isFriend,isBirthday`
-        }));
-
+        // --- Étape 1 : essayer l'API Facebook (batch) ---
+        let graphResult = {};
         try {
-            // Amélioration 3: Échapper correctement la requête batch et gérer le token
-            const token = ctx.access_token || process.env.FB_API_KEY || "";
+            const requests = ids.map(id => ({
+                method: "GET",
+                relative_url: `${encodeURIComponent(id)}?fields=id,name,firstName,lastName,thumbSrc,profileUrl,isFriend,isBirthday`
+            }));
+
             const form = {
                 batch: JSON.stringify(requests),
-                include_headers: false,
-                access_token: token || undefined
+                include_headers: false
             };
-            
-            // Amélioration 4: Utiliser l'API graph.facebook.com standard
+
             const res = await defaultFuncs
                 .post("https://graph.facebook.com/v18.0/", ctx.jar, form)
                 .then(utils.parseAndCheckLogin(ctx, defaultFuncs));
 
-            if (!res || res.error) {
-                throw res;
-            }
-
-            // Amélioration 5: Formater la réponse pour correspondre à l'attendu du bot
-            const resultObj = {};
-            res.forEach((data, index) => {
-                if (data && data.code === 200) {
-                    const userData = JSON.parse(data.body);
-                    resultObj[ids[index]] = userData;
-                }
-            });
-
-            return inputIsArray ? resultObj : resultObj[userIDs];
-        } catch (err) {
-            // Fallback si la requête batch échoue
-            if (inputIsArray) {
-                const resultObj = {};
-                ids.forEach(id => {
-                    resultObj[id] = {
-                        id: id,
-                        name: "Facebook User",
-                        firstName: "Facebook",
-                        thumbSrc: `https://graph.facebook.com/${id}/picture?width=100&height=100`
-                    };
+            if (res && !res.error) {
+                res.forEach((data, index) => {
+                    if (data && data.code === 200) {
+                        try {
+                            graphResult[ids[index]] = JSON.parse(data.body);
+                        } catch (e) {
+                            graphResult[ids[index]] = {};
+                        }
+                    }
                 });
-                return resultObj;
             }
-            return {
-                [userIDs]: {
-                    id: userIDs,
-                    name: "Facebook User",
-                    firstName: "Facebook",
-                    thumbSrc: `https://graph.facebook.com/${userIDs}/picture?width=100&height=100`
-                }
-            };
+        } catch (err) {
+            log.warn("getUserInfo", "Facebook batch request failed, will use local cache.");
         }
+
+        // --- Étape 2 : compléter avec la base locale usersData ---
+        const resultObj = {};
+        for (const id of ids) {
+            // Si l'API Facebook a renvoyé un nom valide, on le garde
+            if (graphResult[id] && graphResult[id].name && graphResult[id].name !== "Facebook User") {
+                resultObj[id] = graphResult[id];
+                continue;
+            }
+
+            // Sinon, on essaie de récupérer le nom depuis usersData
+            let localName = null;
+            try {
+                // On accède à usersData via l'objet global (disponible dans tout le processus du bot)
+                const usersData = global.GoatBot?.usersData || global.usersData;
+                if (usersData) {
+                    localName = await usersData.getName(id);
+                }
+            } catch (e) {}
+
+            // Construction de l'objet final avec le nom trouvé (local ou fallback)
+            resultObj[id] = {
+                id: id,
+                name: localName || "Facebook User",
+                firstName: "Facebook",
+                thumbSrc: `https://graph.facebook.com/${id}/picture?width=100&height=100`,
+                ...(graphResult[id] || {})
+            };
+            // On remplace le nom si on avait un résultat partiel
+            if (localName) {
+                resultObj[id].name = localName;
+            }
+        }
+
+        return isMultiple ? resultObj : resultObj[userID];
     };
 };
