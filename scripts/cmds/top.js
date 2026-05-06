@@ -3,7 +3,7 @@ const { createCanvas } = require("canvas");
 const axios = require("axios");
 
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
-const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
+const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/format";
 
 function toBold(text) {
     const boldMap = {
@@ -26,7 +26,6 @@ function toBold(text) {
 async function getAllUsersCash() {
     try {
         const response = await axios.get(`${CASH_API_URL}/top?limit=50`);
-        console.log("[TOP] Réponse API Cash:", JSON.stringify(response.data).substring(0, 200));
         if (response.data && response.data.success && Array.isArray(response.data.data)) {
             return response.data.data;
         }
@@ -34,6 +33,28 @@ async function getAllUsersCash() {
         console.error("Cash API Error:", error.message);
     }
     return [];
+}
+
+async function formatNumberWithAPI(num) {
+    try {
+        const response = await axios.get(`${CONVERT_API_URL}?number=${num}`);
+        if (response.data && response.data.success) return response.data.formatted;
+    } catch (error) {}
+    if (num === null || num === undefined || isNaN(num)) return "0";
+    const suffixes = [
+        { value: 1e33, suffix: 'd' }, { value: 1e30, suffix: 'n' }, { value: 1e27, suffix: 'o' },
+        { value: 1e24, suffix: 'S' }, { value: 1e21, suffix: 's' }, { value: 1e18, suffix: 'Q' },
+        { value: 1e15, suffix: 'q' }, { value: 1e12, suffix: 't' }, { value: 1e9, suffix: 'b' },
+        { value: 1e6, suffix: 'm' }, { value: 1e3, suffix: 'k' }
+    ];
+    const absNum = Math.abs(num);
+    const sign = num < 0 ? "-" : "";
+    for (const s of suffixes) {
+        if (absNum >= s.value) {
+            return sign + (absNum / s.value).toFixed(1).replace(/\.0$/, '') + s.suffix;
+        }
+    }
+    return sign + absNum.toString();
 }
 
 function formatNumber(num) {
@@ -100,8 +121,8 @@ async function generateTopImage(users, page, totalPages) {
     for (let i = 0; i < users.length; i++) {
         const user = users[i];
         const rank = (page - 1) * 10 + i + 1;
-        const name = user.name ? (user.name.length > 20 ? user.name.substring(0, 18) + "..." : user.name) : user.userId;
-        const cash = formatNumber(user.cash || 0);
+        const name = user.name || `User_${String(user.userId).slice(-5)}`;
+        const cash = user.formattedCash || formatNumber(user.cash || 0);
 
         if (rank === 1) ctx.fillStyle = "#ffd700";
         else if (rank === 2) ctx.fillStyle = "#c0c0c0";
@@ -135,18 +156,17 @@ async function generateTopImage(users, page, totalPages) {
 module.exports = {
     config: {
         name: "top",
-        version: "2.4",
+        version: "6.0",
         author: "Itachi Soma",
         role: 0,
         shortDescription: { en: "Top richest users" },
-        longDescription: { en: "Displays the top 50 richest users" },
+        longDescription: { en: "Displays the top 50 richest users with real names" },
         category: "group",
         guide: { en: "{pn} [page]" }
     },
 
-    onStart: async function ({ api, args, message, event }) {
+    onStart: async function ({ api, args, message, event, usersData }) {
         const allUsers = await getAllUsersCash();
-        console.log("[TOP] Utilisateurs récupérés:", allUsers.length);
 
         if (allUsers.length === 0) {
             return message.reply(toBold("❌ Aucune donnée trouvée."));
@@ -162,25 +182,46 @@ module.exports = {
 
         const startIndex = (page - 1) * usersPerPage;
         const endIndex = startIndex + usersPerPage;
-        const usersOnPage = allUsers.slice(startIndex, endIndex);
+        let usersOnPage = allUsers.slice(startIndex, endIndex);
 
         const enrichedUsers = [];
         for (const user of usersOnPage) {
+            let name = null;
+
+            // 1. Essayer getUserInfo (endpoint Messenger, notre fix)
             try {
-                const userInfo = await api.getUserInfo(user.userId);
-                const name = userInfo[user.userId]?.name || user.userId;
-                enrichedUsers.push({ ...user, name: toBold(name) });
-            } catch (e) {
-                enrichedUsers.push({ ...user, name: user.userId });
+                const info = await api.getUserInfo(user.userId);
+                if (info && info.name && info.name !== user.userId && !info.name.startsWith("User_")) {
+                    name = info.name;
+                }
+            } catch (e) {}
+
+            // 2. Fallback : base locale usersData
+            if (!name) {
+                try {
+                    const localName = await usersData.getName(user.userId);
+                    if (localName && localName !== user.userId && localName !== "Facebook User") {
+                        name = localName;
+                    }
+                } catch (e) {}
             }
+
+            // 3. Dernier recours : ID tronqué
+            if (!name) name = `User_${String(user.userId).slice(-5)}`;
+
+            const formattedCash = await formatNumberWithAPI(user.cash || 0);
+            enrichedUsers.push({
+                ...user,
+                name: toBold(name),
+                formattedCash
+            });
         }
 
         let textMsg = toBold("📝 TOP 50 - LES PLUS RICHES") + `\n━━━━━━━━━━━━━━━━━━\n`;
         enrichedUsers.forEach((user, index) => {
             const rank = startIndex + index + 1;
             const prefix = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "▸";
-            const formattedCash = formatNumber(user.cash || 0);
-            textMsg += `${prefix} ${rank}. ${user.name}: ${formattedCash}$\n`;
+            textMsg += `${prefix} ${rank}. ${user.name}: ${user.formattedCash}$\n`;
         });
         textMsg += `━━━━━━━━━━━━━━━━━━\n${toBold(`📜 Page ${page}/${totalPages}`)}`;
 
