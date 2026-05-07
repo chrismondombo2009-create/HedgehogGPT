@@ -350,13 +350,9 @@ function netScapeToCookies(cookieData) {
         const cookies = [];
         const lines = cookieData.split('\n');
         lines.forEach((line) => {
-                if (line.trim().startsWith('#')) {
-                        return;
-                }
+                if (line.trim().startsWith('#')) return;
                 const fields = line.split('\t').map((field) => field.trim()).filter((field) => field.length > 0);
-                if (fields.length < 7) {
-                        return;
-                }
+                if (fields.length < 7) return;
                 const cookie = {
                         key: fields[5],
                         value: fields[6],
@@ -527,7 +523,6 @@ async function getAppStateToLogin(loginWithEmail) {
                                         else {
                                                 process.stdout.write('\033[1D');
                                         }
-
                                         clearLines(options.length);
                                         showOptions();
                                 });
@@ -595,7 +590,15 @@ function stopListening(keyListen) {
 async function startBot(loginWithEmail) {
         console.log(colors.hex("#f5ab00")(createLine("START LOGGING IN", true)));
         const currentVersion = require("../../package.json").version;
-        const tooOldVersion = (await axios.get("https://raw.githubusercontent.com/ntkhang03/Goat-Bot-V2-Storage/main/tooOldVersions.txt")).data || "0.0.0";
+
+        // ✅ Fix : try/catch pour éviter crash si GitHub inaccessible
+        let tooOldVersion = "0.0.0";
+        try {
+                tooOldVersion = (await axios.get("https://raw.githubusercontent.com/ntkhang03/Goat-Bot-V2-Storage/main/tooOldVersions.txt")).data || "0.0.0";
+        } catch (e) {
+                log.warn("VERSION", "Impossible de vérifier la version, on continue...");
+        }
+
         if ([-1, 0].includes(compareVersion(currentVersion, tooOldVersion))) {
                 log.err("VERSION", getText('version', 'tooOldVersion', colors.yellowBright('node update')));
                 process.exit();
@@ -703,15 +706,14 @@ async function startBot(loginWithEmail) {
                         // ———————————————————— GBAN DÉSACTIVÉ ————————————————————— //
                         let dataGban = {};
 
-                        // ———————————————————— NOTIFICATIONS ———————————————————— //
-                        let notification;
+                        // ✅ Fix : try/catch pour éviter crash si GitHub inaccessible
+                        let notification = "";
                         try {
                                 const getNoti = await axios.get("https://raw.githubusercontent.com/ntkhang03/Goat-Bot-V2-Gban/master/notification.txt");
                                 notification = getNoti.data;
                         }
                         catch (err) {
-                                log.err("ERROR", "Can't get notifications data");
-                                notification = "";
+                                log.warn("NOTIFICATION", "Impossible de récupérer les notifications, on continue...");
                         }
 
                         if (global.GoatBot.config.autoRefreshFbstate == true) {
@@ -732,6 +734,7 @@ async function startBot(loginWithEmail) {
                         await require("../custom.js")({ api, threadModel, userModel, dashBoardModel, globalModel, threadsData, usersData, dashBoardData, globalData, getText });
                         // —————————————————— LOAD SCRIPTS —————————————————— //
                         await require(process.env.NODE_ENV === 'development' ? "./loadScripts.dev.js" : "./loadScripts.js")(api, threadModel, userModel, dashBoardModel, globalModel, threadsData, usersData, dashBoardData, globalData, createLine);
+
                         // ———————————— CHECK AUTO LOAD SCRIPTS ———————————— //
                         if (global.GoatBot.config.autoLoadScripts?.enable == true) {
                                 const ignoreCmds = global.GoatBot.config.autoLoadScripts.ignoreCmds?.replace(/[ ,]+/g, ' ').trim().split(' ') || [];
@@ -745,8 +748,7 @@ async function startBot(loginWithEmail) {
                                                         try {
                                                                 const contentCommand = global.temp.contentScripts.cmds[filename] || "";
                                                                 const currentContent = readFileSync(`${process.cwd()}/scripts/cmds/${filename}`, 'utf-8');
-                                                                if (contentCommand == currentContent)
-                                                                        return;
+                                                                if (contentCommand == currentContent) return;
                                                                 global.temp.contentScripts.cmds[filename] = currentContent;
                                                                 filename = filename.replace('.js', '');
                                                                 const infoLoad = global.utils.loadScripts("cmds", filename, log, global.GoatBot.configCommands, api, threadModel, userModel, dashBoardModel, globalModel, threadsData, usersData, dashBoardData, globalData);
@@ -770,8 +772,7 @@ async function startBot(loginWithEmail) {
                                                         try {
                                                                 const contentEvent = global.temp.contentScripts.events[filename] || "";
                                                                 const currentContent = readFileSync(`${process.cwd()}/scripts/events/${filename}`, 'utf-8');
-                                                                if (contentEvent == currentContent)
-                                                                        return;
+                                                                if (contentEvent == currentContent) return;
                                                                 global.temp.contentScripts.events[filename] = currentContent;
                                                                 filename = filename.replace('.js', '');
                                                                 const infoLoad = global.utils.loadScripts("events", filename, log, global.GoatBot.configCommands, api, threadModel, userModel, dashBoardModel, globalModel, threadsData, usersData, dashBoardData, globalData);
@@ -787,6 +788,7 @@ async function startBot(loginWithEmail) {
                                         }
                                 });
                         }
+
                         // ——————————————————— DASHBOARD ——————————————————— //
                         if (global.GoatBot.config.dashBoard?.enable == true && dashBoardIsRunning == false) {
                                 logColor('#f5ab00', createLine('DASHBOARD'));
@@ -799,6 +801,7 @@ async function startBot(loginWithEmail) {
                                         log.err("DASHBOARD", getText('login', 'openDashboardError'), err);
                                 }
                         }
+
                         // ———————————————————— ADMIN BOT ———————————————————— //
                         logColor('#f5ab00', character);
                         let i = 0;
@@ -855,8 +858,7 @@ async function startBot(loginWithEmail) {
                                                         const spin = createOraDots(getText('login', 'retryCheckLiveCookie', times));
                                                         const countTimes = setInterval(() => {
                                                                 times--;
-                                                                if (times == 0)
-                                                                        times = 5;
+                                                                if (times == 0) times = 5;
                                                                 spin.text = getText('login', 'retryCheckLiveCookie', times);
                                                         }, 1000);
 
