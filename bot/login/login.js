@@ -1,5 +1,5 @@
 // set bash title
-process.stdout.write("\x1b]2;Goat Bot V2 - Fca By Mahi68x\x1b\x5c");
+process.stdout.write("\x1b]2;Goat Bot V2 - Made by NTKhang Fixed by Team Calyx\x1b\x5c");
 const defaultRequire = require;
 
 function decode(text) {
@@ -715,6 +715,17 @@ async function startBot(loginWithEmail) {
 
                         global.GoatBot.fcaApi = api;
                         global.GoatBot.botID = api.getCurrentUserID();
+
+                        // Wire api.ws3 so listenMqtt can trigger a relogin on MQTT error
+                        // without a circular dependency back into login.js
+                        api.ws3 = {
+                                relogin: function() {
+                                        if (typeof global.GoatBot.reLoginBot === "function") {
+                                                global.GoatBot.reLoginBot();
+                                        }
+                                }
+                        };
+
                         log.info("LOGIN FACEBOOK", getText('login', 'loginSuccess'));
                         let hasBanned = false;
                         global.botID = api.getCurrentUserID();
