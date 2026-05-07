@@ -19,22 +19,20 @@
 
 const { spawn } = require("child_process");
 const log = require("./logger/log.js");
-const { toJoinFont, formatJoinMessage } = require('./utils/textFormatter');
-global.toJoin = toJoinFont;
-global.formatJoin = formatJoinMessage;
-function startProject() {
-	const child = spawn("node", ["Goat.js"], {
-		cwd: __dirname,
-		stdio: "inherit",
-		shell: true
-	});
 
-	child.on("close", (code) => {
-		if (code == 2) {
-			log.info("Restarting Project...");
-			startProject();
-		}
-	});
+function startProject() {
+        const child = spawn("node", ["Goat.js"], {
+                cwd: __dirname,
+                stdio: "inherit",
+                shell: true
+        });
+
+        child.on("close", (code) => {
+                if (code == 2) {
+                        log.info("Restarting Project...");
+                        startProject();
+                }
+        });
 }
 
 startProject();
