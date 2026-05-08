@@ -1,7 +1,7 @@
 const fs = require("fs");
 const { createCanvas, loadImage } = require("canvas");
 const axios = require("axios");
-const { getUsername } = require("../../utils/getUsername");
+const { getUsername } = require("../../utils/getUsername.js");
 const { toBold } = require("../../utils/toBold");
 
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
