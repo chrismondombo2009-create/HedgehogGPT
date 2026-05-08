@@ -187,6 +187,8 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                         userModel, threadModel, prefix, dashBoardModel,
                         globalModel, dashBoardData, globalData, envCommands,
                         envEvents, envGlobal, role,
+                        getUsername: global.utils.getUsername,
+                        toBold: global.utils.toBold,
                         removeCommandNameFromBody: function removeCommandNameFromBody(body_, prefix_, commandName_) {
                                 if ([body_, prefix_, commandName_].every(x => nullAndUndefined.includes(x)))
                                         throw new Error("Please provide body, prefix and commandName to use this function, this function without parameters only support for onStart");
@@ -307,6 +309,8 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         args,
                                         commandName,
                                         getLang: getText2,
+                                        getUsername: global.utils.getUsername,
+                                        toBold: global.utils.toBold,
                                         removeCommandNameFromBody
                                 });
                                 timestamps[senderID] = dateNow;
@@ -356,7 +360,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         isUserCallCommand,
                                         args,
                                         commandName,
-                                        getLang: getText2
+                                        getLang: getText2,
+                                        getUsername: global.utils.getUsername,
+                                        toBold: global.utils.toBold
                                 })
                                         .then(async (handler) => {
                                                 if (typeof handler == "function") {
@@ -413,7 +419,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         ...parameters,
                                         args,
                                         commandName,
-                                        getLang: getText2
+                                        getLang: getText2,
+                                        getUsername: global.utils.getUsername,
+                                        toBold: global.utils.toBold
                                 })
                                         .then(async (handler) => {
                                                 if (typeof handler == "function") {
@@ -468,7 +476,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         isUserCallCommand,
                                         args,
                                         commandName,
-                                        getLang: getText2
+                                        getLang: getText2,
+                                        getUsername: global.utils.getUsername,
+                                        toBold: global.utils.toBold
                                 })
                                         .then(async (handler) => {
                                                 if (typeof handler == "function") {
@@ -543,7 +553,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         Reply,
                                         args,
                                         commandName,
-                                        getLang: getText2
+                                        getLang: getText2,
+                                        getUsername: global.utils.getUsername,
+                                        toBold: global.utils.toBold
                                 });
                                 log.info("onReply", `${commandName} | ${userData.name} | ${senderID} | ${threadID} | ${args.join(" ")}`);
                         }
@@ -606,7 +618,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         Reaction,
                                         args,
                                         commandName,
-                                        getLang: getText2
+                                        getLang: getText2,
+                                        getUsername: global.utils.getUsername,
+                                        toBold: global.utils.toBold
                                 });
                                 log.info("onReaction", `${commandName} | ${userData.name} | ${senderID} | ${threadID} | ${event.reaction}`);
                         }
@@ -636,7 +650,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         const handler = await getEvent.onStart({
                                                 ...parameters,
                                                 commandName,
-                                                getLang: getText2
+                                                getLang: getText2,
+                                                getUsername: global.utils.getUsername,
+                                                toBold: global.utils.toBold
                                         });
                                         if (typeof handler == "function") {
                                                 await handler();
@@ -684,7 +700,9 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
                                         ...parameters,
                                         args,
                                         commandName,
-                                        getLang: getText2
+                                        getLang: getText2,
+                                        getUsername: global.utils.getUsername,
+                                        toBold: global.utils.toBold
                                 })
                                         .then(async (handler) => {
                                                 if (typeof handler == "function") {
