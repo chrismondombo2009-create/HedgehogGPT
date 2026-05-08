@@ -14,7 +14,8 @@ const ora = require("ora");
 const log = require("./logger/log.js");
 const { isHexColor, colors } = require("./func/colors.js");
 const Prism = require("./func/prism.js");
-
+const { getUsername } = require("./utils/getUsername.js");
+const { toBold } = require("./utils/toBold.js");
 const { config } = global.GoatBot;
 const { gmailAccount } = config.credentials;
 const { clientId, clientSecret, refreshToken, apiKey: googleApiKey } = gmailAccount;
@@ -1108,7 +1109,8 @@ const utils = {
         uploadZippyshare,
         uploadImgbb,
         drive,
-
+        getUsername,
+        toBold,
         GoatBotApis,
         
         // Nouvelles fonctions ajoutées
