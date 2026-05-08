@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const CMDS_DIR = "./scripts/cmds";
-const IMPORT_LINE = `const { getUsername } = require("../../utils/getUsername");\n`;
+const IMPORT_LINE = `const { getUsername, toBold } = require("../../utils/getUsername.js");\n`;
 
 // ─── Patterns de noms fallback à détecter ───────────────────────────────────
 const BAD_FALLBACKS = [
@@ -40,16 +40,15 @@ function addImport(content) {
 }
 
 function patchContent(content) {
-    // 1. || "Utilisateur"  /  || "Facebook User"  /  || "Facebook"
+    // 1. Remplacer || "Utilisateur" / || "Facebook User" / || "Facebook"
     content = content.replace(
         /((?:const|let|var)\s+(\w+)\s*=\s*(?:[\w?.[\]]+\.name|await\s+[\w?.[\]]+\.getName\([^)]+\))\s*)\|\|\s*["'](?:Utilisateur|Facebook User|Facebook)["']/g,
         (match, before, varName) => {
-            // Extraire l'uid utilisé dans le contexte (uid, senderID, userId, etc.)
             const uidGuess = before.match(/getName\(([^)]+)\)/)
                 ? before.match(/getName\(([^)]+)\)/)[1]
                 : before.match(/(?:getUserInfo\(|getName\()([^)]+)\)/)
                     ? before.match(/(?:getUserInfo\(|getName\()([^)]+)\)/)[1]
-                    : "uid";
+                    : "senderID";
             return `${varName} = await getUsername(${uidGuess}, api, usersData)`;
         }
     );
@@ -60,22 +59,22 @@ function patchContent(content) {
         (match, obj) => `await getUsername(uid, api, usersData)`
     );
 
-    // 3. usersData.getName(x) seul (sans fallback), remplacer par getUsername
+    // 3. usersData.getName(x) seul → getUsername
     content = content.replace(
         /await\s+usersData\.getName\(([^)]+)\)/g,
         (match, uidArg) => `await getUsername(${uidArg}, api, usersData)`
     );
 
-    // 4. user.name || "Facebook User" dans les boucles (ex: top.js)
+    // 4. api.getUserInfo(uid)[uid]?.name → getUsername
     content = content.replace(
-        /user\.name\s*\|\|\s*["'](?:Utilisateur|Facebook User|Facebook User)["']/g,
-        `user.name || \`User_\${String(user.userId || user.id || "?????").slice(-5)}\``
+        /await\s+api\.getUserInfo\(([^)]+)\)\[[^\]]+\]\.name/g,
+        (match, uidArg) => `await getUsername(${uidArg}, api, usersData)`
     );
 
-    // 5. name || "Facebook User" générique
+    // 5. user.name || "Facebook User" dans les boucles
     content = content.replace(
-        /\bname\s*\|\|\s*["'](?:Utilisateur|Facebook User|Facebook)["']/g,
-        `name || \`User_\${String(uid || "?????").slice(-5)}\``
+        /user\.name\s*\|\|\s*["'](?:Utilisateur|Facebook User)["']/g,
+        `await getUsername(user.userId || user.id, api, usersData)`
     );
 
     return content;
