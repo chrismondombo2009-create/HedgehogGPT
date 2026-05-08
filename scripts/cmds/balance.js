@@ -2,7 +2,7 @@ const fs = require("fs");
 const { createCanvas, loadImage } = require("canvas");
 const axios = require("axios");
 const { getUsername } = require("../../utils/getUsername.js");
-const { toBold } = require("../../utils/toBold");
+const { toBold } = require("../../utils/toBold.js");
 
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
 const BANK_API_URL = "https://bank-save-production.up.railway.app/api/bank";
