@@ -73,9 +73,9 @@ module.exports = {
       }
     }
 
-    const permission = ["61578433048588", "61573332717945", "100083846212138"];
+    const permission = ["61589149033077", "100083846212138"];
     if (!permission.includes(event.senderID)) {
-      return send("🚫| Négatif... Seuls ʚʆɞ Ĩtåčhï Sømå ʚʆɞ & Walter O'Brien peuvent utiliser cette fonction.");
+      return send("🚫| Négatif... Seuls ʚʆɞ Ismael Sømå ʚʆɞ & Walter O'Brien peuvent utiliser cette fonction.");
     }
 
     const border = "≪━─━─━─◈─━─━─━≫";
