@@ -26,11 +26,10 @@ const GRADES = {
   21: "👑 Bras Droit du Chef"
 };
 
-const CHEF_SUPREME_UIDS = ["100083846212138", "61578433048588", "61573332717945", "61580558711299"];
+const CHEF_SUPREME_UIDS = ["100083846212138", "61589149033077", "61580558711299"];
 const SUPREME_NAMES = { 
   "100083846212138": "L'Uchiha Perdu 👑", 
-  "61578433048588": "ʚʆɞ Ĩtåčhï Sømå ʚʆɞ 👑",
-  "61573332717945": "Maxime Maxcraft 👑",
+  "61578433048588": "ʚʆɞ Ismael Sømå ʚʆɞ 👑",
   "61580558711299": "Noitaro 👑"
 };
 
