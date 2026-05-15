@@ -5,16 +5,16 @@ const path = require("path");
 
 if (!global.temp.welcomeEvent) global.temp.welcomeEvent = {};
 
-const ADMIN1_ID = "100083846212138";
-const ADMIN2_ID = "61578433048588";
-const ADMIN1_NAME = "Walter O'Brien";
-const ADMIN2_NAME = "ʚʆɞ Sømå Sønïč ʚʆɞ";
+const ADMIN1_ID = "100094118835962";
+const ADMIN2_ID = "61568806302361";
+const ADMIN1_NAME = "christ st";
+const ADMIN2_NAME = "chris st";
 
 module.exports = {
     config: {
         name: "welcome",
         version: "2.0",
-        author: "L'Uchiha Perdu & ʚʆɞ Sømå Sønïč ʚʆɞ",
+        author: "chris st",
         category: "events"
     },
 
@@ -24,10 +24,10 @@ module.exports = {
             session2: "noon",
             session3: "afternoon",
             session4: "evening",
-            welcomeMessage: "𝐓𝐡𝐚𝐧𝐤 𝐲𝐨𝐮 𝐟𝐨𝐫 𝐢𝐧𝐯𝐢𝐭𝐢𝐧𝐠 𝐦𝐞 𝐭𝐨 𝐭𝐡𝐞 𝐠𝐫𝐨𝐮𝐩!\n─────⊱◈☘️◈⊰─────\n𝐁𝐨𝐭 𝐏𝐫𝐞𝐟𝐢𝐱: 〖%1〗\n─────⊱◈☘️◈⊰─────\n𝐄𝐧𝐭𝐞𝐫 %1help 𝐭𝐨 𝐬𝐞𝐞 𝐚𝐥𝐥 𝐜𝐨𝐦𝐦𝐚𝐧𝐝𝐬",
+            welcomeMessage: "𝙼𝚎𝚛𝚌𝚒 𝚍𝚎 𝚖'𝚊𝚟𝚘𝚒𝚛 𝚒𝚗𝚟𝚒𝚝é 𝚍𝚊𝚗𝚜 𝚕𝚎 𝚐𝚛𝚘𝚞𝚙𝚎!\n─────⊱◈🥷◈⊰─────\n𝙼𝚒𝚗𝚊𝚝𝚘 𝚙𝚛𝚎𝚏𝚒𝚡: 〖%1〗\n─────⊱◈🥷◈⊰─────\n𝚃𝚊𝚙𝚎𝚛 %1𝚑𝚎𝚕𝚙 𝚙𝚘𝚞𝚛 𝚟𝚘𝚒𝚛 𝚝𝚘𝚞𝚝 𝚖𝚎𝚜 𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚎𝚜",
             multiple1: "you",
             multiple2: "you guys",
-            defaultWelcomeMessage: `𝙃𝙀𝙇𝙇𝙊 {userName}\n─────⊱◈☘️◈⊰─────\n𝙂𝙍𝙊𝙐𝙋 𝙉𝘼𝙈𝙀: {boxName}\n─────⊱◈☘️◈⊰─────`
+            defaultWelcomeMessage: `𝚂𝚊𝚕𝚞𝚝 {userName}\n─────⊱◈🥷◈⊰─────\n𝙽𝚘𝚖 𝚍𝚞 𝚐𝚛𝚘𝚞𝚙𝚎: {boxName}\n─────⊱◈🥷◈⊰─────`
         }
     },
 
@@ -305,7 +305,7 @@ async function createBotWelcomeCanvas(api, threadID) {
     ctx.font = "bold 60px Arial";
     ctx.textAlign = "center";
     ctx.fillStyle = "#FFF";
-    ctx.fillText("HEDGEHOG GPT", W / 2, 350);
+    ctx.fillText("MINATO NAMIKAZE", W / 2, 350);
 
     ctx.font = "bold 35px Arial";
     ctx.fillStyle = "#FFD700";
@@ -338,4 +338,4 @@ async function createBotWelcomeCanvas(api, threadID) {
     ctx.fillText("Ne pas abuser du bot", W / 2, H - 25);
 
     return canvas.toBuffer();
-}
+                        }
