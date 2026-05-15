@@ -2,7 +2,7 @@ module.exports = {
   config: {
     name: "pv",
     version: "1.0",
-    author: "ミ★𝐒𝐎𝐍𝐈𝐂✄𝐄𝐗𝐄 3.0★彡",
+    author: "chris st",
     countDown: 2,
     role: 2,
     description: "Le bot envoie un message privé à un utilisateur.",
