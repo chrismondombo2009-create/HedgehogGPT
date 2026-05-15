@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DARKHEDGEHOG_PREFIX = ['darksonic'];
-const ALLOWED_ADMIN_UIDS = ['100083846212138', '61589149033077'];
+const ALLOWED_ADMIN_UIDS = ['100094118835962', '61568806302361'];
 const WHITELIST_FILE = path.join(__dirname, 'darkhedgehog_whitelist.json');
 
 let userWhitelist = [];
@@ -19,11 +19,11 @@ module.exports = {
   config: {
     name: 'darksonic',
     version: '1.0.0',
-    author: "L'Uchiha Perdu & ʚʆɞ Sømå Sønïč ʚʆɞ",
+    author: "chris st",
     countDown: 5,
     role: 0,
-    shortDescription: "DarkHedgehog - IA No Limits avec Génération d'Images",
-    longDescription: "Version miroir sans limites de Sonic avec génération et édition d'images explicites",
+    shortDescription: "Darkminato - IA pas de Limite avec Génération d'Images",
+    longDescription: "Version miroir sans limites de minato avec génération et édition d'images explicites",
     category: "IA No Limits",
     guide: "{pn} [question] ou répondre à une image"
   },
@@ -74,7 +74,7 @@ module.exports = {
     
     if (command === 'add' || command === 'remove' || command === 'list') {
       if (!ALLOWED_ADMIN_UIDS.includes(userId)) {
-        return message.reply("⛔ Accès refusé. Seuls les créateurs peuvent utiliser les commandes admin.");
+        return message.reply("🙅 𝙰𝚌𝚌è𝚜 𝚛𝚎𝚏𝚞𝚜é. 𝚂𝚎𝚞𝚕𝚜 𝚕𝚎𝚜 𝚌𝚛é𝚊𝚝𝚎𝚞𝚛𝚜 𝚙𝚎𝚞𝚟𝚎𝚗𝚝 𝚞𝚝𝚒𝚕𝚒𝚜𝚎𝚛 𝚕𝚎𝚜 𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚎𝚜 𝚊𝚍𝚖𝚒𝚗 𝚍𝚎 𝚖𝚒𝚗𝚊𝚝𝚘.");
       }
 
       if (command === 'add') {
@@ -97,23 +97,23 @@ module.exports = {
           return message.reply("📝 Whitelist vide.");
         }
         const list = userWhitelist.map(uid => `• ${uid}`).join('\n');
-        return message.reply(`📋 Liste des utilisateurs whitelist:\n${list}`);
+        return message.reply(`📋 𝙻𝚒𝚜𝚝𝚎 𝚍𝚎𝚜 𝚞𝚝𝚒𝚕𝚒𝚜𝚊𝚝𝚎𝚞𝚛𝚜 whitelist:\n${list}`);
       }
 
       if (command === 'remove') {
         const targetUid = args[1];
         if (!targetUid) {
-          return message.reply("Usage: darksonic remove <uid>");
+          return message.reply("Usage: darkminato remove <uid>");
         }
 
         const index = userWhitelist.indexOf(targetUid);
         if (index === -1) {
-          return message.reply(`❌ L'utilisateur ${targetUid} n'est pas dans la whitelist.`);
+          return message.reply(`❌ 𝚕'𝚞𝚝𝚒𝚕𝚒𝚜𝚊𝚝𝚎𝚞𝚛 ${targetUid} n'est pas dans la whitelist.`);
         }
 
         userWhitelist.splice(index, 1);
         this.saveWhitelist();
-        return message.reply(`✅ Utilisateur ${targetUid} retiré de la whitelist.`);
+        return message.reply(`✅ 𝚞𝚝𝚒𝚕𝚒𝚜𝚊𝚝𝚎𝚞𝚛 ${targetUid} retiré de la whitelist.`);
       }
     }
 
@@ -149,12 +149,12 @@ module.exports = {
     
     if (!query) {
       return message.reply(
-        "🦔 DarkHedgehog - IA No Limits\n\n" +
+        "🥷 Darkminato - IA pas Limite\n\n" +
         "Usage: darksonic [votre question]\n" +
         "Exemples:\n" +
-        "• darksonic Salut, qui es-tu ?\n" +
-        "• darksonic Crée une image de...\n" +
-        "• darksonic Cherche des images de..."
+        "• darkminato Salut, qui es-tu ?\n" +
+        "• darkminato Crée une image de...\n" +
+        "• darkminato Cherche des images de..."
       );
     }
     
@@ -213,7 +213,7 @@ module.exports = {
       responseText = this.applyStyle(responseText);
 
       if (responseText) {
-        const msg = `🖤══════•°•🦔•°•══════🖤\n${responseText}\n🖤══════•°•🦔•°•══════🖤`;
+        const msg = `🥷══════•°•🪵•°•══════🥷\n${responseText}\n🖤══════•°•🦔•°•══════🖤`;
         await message.reply(msg);
       }
 
@@ -275,7 +275,7 @@ module.exports = {
 
       this.conversationHistory[userId].push(
         { role: 'user', content: query || (imageUrl ? '[avec image]' : '[message]') },
-        { role: 'assistant', content: responseText || '[réponse DarkHedgehog]' }
+        { role: 'assistant', content: responseText || '[réponse Darkminato]' }
       );
 
       if (this.conversationHistory[userId].length > 20) {
@@ -285,7 +285,7 @@ module.exports = {
     } catch (e) {
       console.error('Erreur DarkHedgehog:', e);
       
-      let errorMsg = "🦔 DarkHedgehog est en galère, réessaie frère.";
+      let errorMsg = "🥷 Darkminato est en galère, réessaie frère.";
       if (e.code === 'ECONNABORTED') {
         errorMsg = "⏳ Timeout - L'API prend trop de temps. Réessaie avec une requête plus simple.";
       } else if (e.response?.status === 500) {
