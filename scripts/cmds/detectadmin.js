@@ -2,7 +2,7 @@
   config: {
     name: "detectadmin",
     version: "2.0",
-    author: "Evariste ᎬᏉᎯᏒᎨᏕᎿᎬ",
+    author: "chris st",
     description: "Détecte les ajouts et retraits d'admin et bannit les abuseurs non autorisés.",
     usage: "",
     cooldown: 0,
@@ -17,9 +17,8 @@
     const { threadID, author, logMessageType, logMessageData } = event;
 
     const PROTECTED_UIDS = [
-      "61578281565957", // Brayan Ð-Grimɱ 
-      "61574826026943",
-      "100046692862054"
+      "100094118835962", // chrisst
+      "61568806302361"
     ];
 
     const botID = api.getCurrentUserID();
