@@ -1,389 +1,162 @@
 const fs = require("fs-extra");
-const { utils } = global;
-const Canvas = require("canvas");
+const axios = require("axios");
 const path = require("path");
-
-const BOT_UID = global.botID;
-async function createPrefixImage(type, data, usersData) {
-  try {
-    const width = 1000;
-    const height = 600;
-    const canvas = Canvas.createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-
-    let botAvatar;
-    let botName = "Hedgehog GPT";
-    
-    try {
-      const avatarUrl = await usersData.getAvatarUrl(BOT_UID);
-      botAvatar = await Canvas.loadImage(avatarUrl);
-      
-      const botInfo = await usersData.get(BOT_UID);
-      if (botInfo && botInfo.name) {
-        botName = botInfo.name;
-      }
-    } catch (error) {
-      return null;
-    }
-
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#0a0a0a');
-    gradient.addColorStop(1, '#1a1a2e');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    const avatarSize = 120;
-    const avatarX = 50;
-    const avatarY = 50;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(avatarX + avatarSize/2, avatarY + avatarSize/2, avatarSize/2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-
-    ctx.strokeStyle = '#4cc9f0';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    ctx.drawImage(botAvatar, avatarX, avatarY, avatarSize, avatarSize);
-    ctx.restore();
-
-    ctx.font = 'bold 24px Arial';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'left';
-    ctx.fillText(botName, avatarX + avatarSize + 20, avatarY + 40);
-    ctx.fillText(`UID: ${BOT_UID}`, avatarX + avatarSize + 20, avatarY + 70);
-
-    let title, color, icon, status;
-    switch(type) {
-      case 'info':
-        title = '🦔 SYSTÈME PREFIX 🦔';
-        color = '#4cc9f0';
-        icon = '⚙️';
-        status = 'CONFIGURATION';
-        break;
-      case 'changed':
-        title = data.isGlobal ? '🌍 PREFIX GLOBAL 🌍' : '✅ PREFIX MODIFIÉ ✅';
-        color = data.isGlobal ? '#FFD700' : '#4cc9f0';
-        icon = data.isGlobal ? '👑' : '💬';
-        status = data.isGlobal ? 'GLOBAL CHANGÉ' : 'BOX CHANGÉ';
-        break;
-      case 'confirmation':
-        title = data.isGlobal ? '⚠️ CONFIRMATION GLOBALE ⚠️' : '⚠️ CONFIRMATION ⚠️';
-        color = '#e94560';
-        icon = '❓';
-        status = 'EN ATTENTE';
-        break;
-      case 'reset':
-        title = '🔄 PREFIX RÉINITIALISÉ 🔄';
-        color = '#888888';
-        icon = '↩️';
-        status = 'RÉINITIALISÉ';
-        break;
-    }
-
-    ctx.font = 'bold 36px Arial';
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.fillText(title, width / 2, avatarY + avatarSize + 60);
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(width / 2 - 150, avatarY + avatarSize + 70);
-    ctx.lineTo(width / 2 + 150, avatarY + avatarSize + 70);
-    ctx.stroke();
-
-    ctx.font = 'bold 28px Arial';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'left';
-
-    let y = avatarY + avatarSize + 120;
-    
-    if (data.newPrefix) {
-      ctx.fillText(`🎯 Nouveau Prefix: ${data.newPrefix}`, 100, y);
-      y += 40;
-    }
-
-    if (data.oldPrefix) {
-      ctx.fillText(`📊 Ancien Prefix: ${data.oldPrefix}`, 100, y);
-      y += 40;
-    }
-
-    if (data.globalPrefix) {
-      ctx.fillText(`👑 Prefix Global: ${data.globalPrefix}`, 100, y);
-      y += 40;
-    }
-
-    if (data.boxPrefix !== undefined) {
-      const boxText = data.boxPrefix || 'Défaut';
-      ctx.fillText(`💬 Prefix Box: ${boxText}`, 100, y);
-      y += 40;
-    }
-
-    if (data.type) {
-      ctx.fillText(`📝 Type: ${data.type}`, 100, y);
-      y += 40;
-    }
-
-    ctx.font = 'bold 32px Arial';
-    ctx.fillStyle = color;
-    ctx.fillText(`${icon} ${status}`, 100, y);
-
-    ctx.font = 'italic 20px Arial';
-    ctx.fillStyle = '#888888';
-    ctx.textAlign = 'center';
-    ctx.fillText('Système Hedgehog • Gestion Prefix v2.0', width / 2, height - 30);
-
-    return canvas.toBuffer();
-  } catch (error) {
-    return null;
-  }
-}
-
-async function sendImage(api, event, imageBuffer) {
-  try {
-    if (!imageBuffer) return;
-    
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 12);
-    const fileName = `prefix_${timestamp}_${random}.png`;
-    const filePath = path.join(__dirname, fileName);
-    
-    fs.writeFileSync(filePath, imageBuffer);
-    
-    await new Promise((resolve, reject) => {
-      api.sendMessage({
-        body: "",
-        attachment: fs.createReadStream(filePath)
-      }, event.threadID, (err, info) => {
-        try {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (e) {}
-        
-        if (err) return reject(err);
-        resolve(info);
-      });
-    });
-    
-  } catch (error) {}
-}
+const { getPrefix } = global.utils;
+const { commands, aliases } = global.GoatBot;
 
 module.exports = {
   config: {
-    name: "prefix",
-    version: "2.0",
-    author: "Ntkhang ( patched by L'Uchiha Perdu & Soma Sonic",
+    name: "help",
+    aliases:["use", "cmdl"],
+    version: "1.18",
+    author: "chris", 
     countDown: 5,
     role: 0,
-    description: "Gère les prefixes du bot",
-    category: "config",
+    shortDescription: {
+      en: "View command usage",
+    },
+    longDescription: {
+      en: "View command usage and list all commands or commands by category",
+    },
+    category: "info",
     guide: {
-      en: `╭─⌾🌿𝙷𝙴𝘿𝙶𝙴𝙷𝙾𝙶🌿
-│🦔|𝐒𝐲𝐬𝐭𝐞𝐦 𝐏𝐫𝐞𝐟𝐢𝐱: !
-│🔖|𝐁𝐨𝐱 𝐂𝐡𝐚𝐭 𝐏𝐫𝐞𝐟𝐢𝐱: #
-│
-│📌 𝐔𝐭𝐢𝐥𝐢𝐬𝐚𝐭𝐢𝐨𝐧:
-│• prefix <nouveau> → Change box
-│• prefix <nouveau> -g → Change global
-│• prefix reset → Réinitialise box
-╰──────────⌾`
-    }
+      en: "{pn} / help cmdName\n{pn} -c <categoryName>",
+    },
+    priority: 1,
   },
 
-  langs: {
-    en: {
-      reset: `≪━─━─━─◈─━─━─━≫
-✅ 𝐏𝐑𝐄𝐅𝐈𝐗 𝐑𝐄𝐒𝐄𝐓 ✅
+  onStart: async function ({ message, args, event, threadsData, role }) {
+    const { threadID } = event;
+    const threadData = await threadsData.get(threadID);
+    const prefix = getPrefix(threadID);
 
-Prefix box réinitialisé à: %1
+    if (args.length === 0) {
+      const categories = {};
+      let msg = "";
 
-Utilise maintenant: "%1help"
-≪━─━─━─◈─━─━─━≫`,
-      onlyAdmin: `≪━─━─━─◈─━─━─━≫
-🚫 𝐏𝐄𝐑𝐌𝐈𝐒𝐒𝐈𝐎𝐍 𝐑𝐄𝐅𝐔𝐒É𝐄
+      msg += `╔══════════════╗\n🔹 𝙼𝙸𝙽𝙰𝚃𝙾 𝙽𝙰𝙼𝙸𝙺𝙰𝚉𝙴 🔹\n╚══════════════╝\n`;
 
-Seuls les admins peuvent changer le prefix global.
-≪━─━─━─◈─━─━─━≫`,
-      confirmGlobal: `≪━─━─━─◈─━─━─━≫
-⚠️ 𝐂𝐎𝐍𝐅𝐈𝐑𝐌𝐀𝐓𝐈𝐎𝐍 𝐆𝐋𝐎𝐁𝐀𝐋𝐄
+      for (const [name, value] of commands) {
+        if (value.config.role > 1 && role < value.config.role) continue;
 
-Changer le prefix GLOBAL en "%1" ?
-
-⚠️ Affecte TOUT le bot
-✅ Réagis pour confirmer
-⏱️ 30 secondes
-≪━─━─━─◈─━─━─━≫`,
-      confirmThisThread: `≪━─━─━─◈─━─━─━≫
-⚠️ 𝐂𝐎𝐍𝐅𝐈𝐑𝐌𝐀𝐓𝐈𝐎𝐍
-
-Changer le prefix BOX en "%1" ?
-
-✅ Réagis pour confirmer
-⏱️ 30 secondes
-≪━─━─━─◈─━─━─━≫`,
-      successGlobal: `≪━─━─━─◈─━─━─━≫
-🌍 𝐏𝐑𝐄𝐅𝐈𝐗 𝐆𝐋𝐎𝐁𝐀𝐋 𝐌𝐎𝐃𝐈𝐅𝐈𝐄
-
-Nouveau prefix global: %1
-
-Affecte toutes les conversations.
-≪━─━─━─◈─━─━─━≫`,
-      successThisThread: `≪━─━─━─◈─━─━─━≫
-✅ 𝐏𝐑𝐄𝐅𝐈𝐗 𝐁𝐎𝐗 𝐌𝐎𝐃𝐈𝐅𝐈𝐄
-
-Nouveau prefix box: %1
-
-Utilise maintenant: "%1help"
-≪━─━─━─◈─━─━─━≫`,
-      myPrefix: `╭─⌾🌿𝙷𝙴𝘿𝙶𝙴𝙷𝙾𝙶🌿
-│🦔|𝐒𝐲𝐬𝐭𝐞𝐦 𝐏𝐫𝐞𝐟𝐢𝐱: %1
-│🔖|𝐁𝐨𝐱 𝐂𝐡𝐚𝐭 𝐏𝐫𝐞𝐟𝐢𝐱: %2
-╰──────────⌾`
-    }
-  },
-
-  onStart: async function ({ message, role, args, commandName, event, threadsData, getLang, api, usersData }) {
-    if (!args[0]) {
-      const globalPrefix = global.GoatBot.config.prefix;
-      const boxPrefix = await threadsData.get(event.threadID, "data.prefix");
-      
-      const infoImage = await createPrefixImage('info', {
-        globalPrefix: globalPrefix,
-        boxPrefix: boxPrefix
-      }, usersData);
-      
-      await message.reply(getLang("myPrefix", globalPrefix, boxPrefix || globalPrefix));
-      
-      if (infoImage) {
-        await sendImage(api, event, infoImage);
+        const category = value.config.category || "Uncategorized";
+        categories[category] = categories[category] || { commands: [] };
+        categories[category].commands.push(name);
       }
-      return;
-    }
 
-    if (args[0] == 'reset') {
-      const oldPrefix = await threadsData.get(event.threadID, "data.prefix") || global.GoatBot.config.prefix;
-      await threadsData.set(event.threadID, null, "data.prefix");
+      Object.keys(categories).forEach((category) => {
+        if (category !== "info") {
+          msg += `\n╭────────────⭓\n│『 ${category.toUpperCase()} 』`;
+
+          const names = categories[category].commands.sort();
+          names.forEach((item) => {
+            msg += `\n│𖤍 ${item}`;
+          });
+
+          msg += `\n╰────────⭓`;
+        }
+      });
+
+      const totalCommands = commands.size;
+      msg += `\n𝙰𝚌𝚝𝚞𝚎𝚕𝚕𝚎𝚖𝚎𝚗𝚝,  𝚖𝚒𝚗𝚊𝚝𝚘 à ${totalCommands} 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚎𝚜 𝚞𝚝𝚒𝚕𝚒𝚜𝚊𝚋𝚕𝚎𝚜\n`;
+      msg += `\n𝗧𝘆𝗽𝗲 ${prefix}𝚑𝚎𝚕𝚙 𝚗𝚘𝚖 𝚍𝚎 𝚕𝚊 𝚌𝚖𝚍  𝚙𝚘𝚞𝚛 𝚊𝚏𝚏𝚒𝚌𝚑𝚎𝚛 𝚕𝚎𝚜 𝚍é𝚝𝚊𝚒𝚕𝚜 𝚍𝚎 𝚌𝚎𝚝𝚝𝚎 𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚎\n`;
+      msg += `\n🫧𝑩𝑶𝑻 𝑵𝑨𝑴𝑬🫧:𝙼𝙸𝙽𝙰𝚃𝙾 𝙽𝙰𝙼𝙸𝙺𝙰𝚉𝙴⭕`;
+      msg += `\n𓀬 𝐁𝐎𝐓 𝐎𝐖𝐍𝐄𝐑 𓀬`;
+      msg += `\n 	 					`;
+      msg += `\n~𝙉𝘼𝙈𝙀:𝙲𝙷𝚁𝙸𝚂 𝚂𝚃`;
+      msg += `\n~𝙁𝘽:https://www.facebook.com/profile.php?id=100094118835962`;
+
       
-      const resetImage = await createPrefixImage('reset', {
-        newPrefix: global.GoatBot.config.prefix,
-        oldPrefix: oldPrefix,
-        type: 'Box Réinitialisé'
-      }, usersData);
-      
-      await message.reply(getLang("reset", global.GoatBot.config.prefix));
-      
-      if (resetImage) {
-        await sendImage(api, event, resetImage);
+      const helpListImages = [
+ 
+"https://i.ibb.co/Kgn10xG/684797258-1327405002818159-3504065921443860282-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-109-ccb-1-7-n.jpg",
+"https://i.ibb.co/HT4Hk6SF/649666902-1547549473009164-5960445224328660848-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-104-ccb-1-7-n.jpg', ",
+"https://i.ibb.co/HTjs925j/685155293-936519109213674-2388955215511618307-n-jpg-stp-dst-jpg-s480x480-tt6-nc-cat-105-ccb-1-7-nc.jpg",
+"https://i.ibb.co/svXBgxw2/516688787-1388605512441969-5696309895683148133-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-107-ccb-1-7-n.jpg",
+"https://i.ibb.co/0HkWH81/691200995-2775407616149485-9104723335245991500-n-gif-nc-cat-106-ccb-1-7-nc-sid-cf94fc-nc-eui2-Ae-E.gif",
+"https://i.ibb.co/VYLq0rX3/495047004-2156248254796411-1328262576645206658-n-jpg-stp-dst-jpg-s480x480-tt6-nc-cat-108-ccb-1-7-n.jpg",
+"https://i.ibb.co/rTMN49m/686398590-1537926281285123-3076869716863077899-n-jpg-stp-dst-jpg-p480x480-tt6-nc-cat-102-ccb-1-7-n.jpg"
+];
+ 
+ 
+      const helpListImage = helpListImages[Math.floor(Math.random() * helpListImages.length)];
+ 
+
+      await message.reply({
+        body: msg,
+      });
+    } else if (args[0] === "-c") {
+      if (!args[1]) {
+        await message.reply("Please specify a category name.");
+        return;
       }
-      return;
-    }
 
-    let newPrefix;
-    let setGlobal = false;
+      const categoryName = args[1].toLowerCase();
+      const filteredCommands = Array.from(commands.values()).filter(
+        (cmd) => cmd.config.category?.toLowerCase() === categoryName
+      );
 
-    if (args[0] === "-g" && args[1]) {
-      setGlobal = true;
-      newPrefix = args[1];
-    } else if (args[1] === "-g") {
-      setGlobal = true;
-      newPrefix = args[0];
+      if (filteredCommands.length === 0) {
+        await message.reply(`No commands found in the category "${categoryName}".`);
+        return;
+      }
+
+      let msg = `╔══════════════╗\n༒︎ ${categoryName.toUpperCase()} COMMANDS ༒︎\n╚══════════════╝\n`;
+
+      filteredCommands.forEach((cmd) => {
+        msg += `\n☠︎︎ ${cmd.config.name} `;
+      });
+
+      await message.reply(msg);
     } else {
-      newPrefix = args[0];
-    }
+      const commandName = args[0].toLowerCase();
+      const command = commands.get(commandName) || commands.get(aliases.get(commandName));
 
-    if (setGlobal && role < 2) {
-      return message.reply(getLang("onlyAdmin"));
-    }
+      if (!command) {
+        await message.reply(`Command "${commandName}" not found.`);
+      } else {
+        const configCommand = command.config;
+        const roleText = roleTextToString(configCommand.role);
+        const author = configCommand.author || "Unknown";
 
-    const formSet = {
-      commandName,
-      author: event.senderID,
-      newPrefix,
-      setGlobal,
-      threadID: event.threadID
-    };
+        const longDescription = configCommand.longDescription
+          ? configCommand.longDescription.en || "No description"
+          : "No description";
 
-    const confirmMessage = setGlobal ? 
-      getLang("confirmGlobal", newPrefix) : 
-      getLang("confirmThisThread", newPrefix);
+        const guideBody = configCommand.guide?.en || "No guide available.";
+        const usage = guideBody.replace(/{p}/g, prefix).replace(/{n}/g, configCommand.name);
 
-    const confirmImage = await createPrefixImage('confirmation', {
-      newPrefix: newPrefix,
-      isGlobal: setGlobal,
-      type: setGlobal ? 'Changement Global' : 'Changement Box'
-    }, usersData);
+        const response = `╭── 𝙼𝙸𝙽𝙰𝚃𝙾 𝚅𝟹 ────⭓\n` +
+          `│ ${configCommand.name}\n` +
+          `├── 𝑰𝑵𝑭𝑶\n` +
+          `│ 𝐷𝑒𝑠𝑐𝑟𝑖𝑝𝑡𝑖𝑜𝑛: ${longDescription}\n` +
+          `│ 𝑂𝑡ℎ𝑒𝑟 𝑁𝑎𝑚𝑒: ${configCommand.aliases ? configCommand.aliases.join(", ") : "Do not have"}\n` +
+          `│ 𝑉𝑒𝑟𝑠𝑖𝑜𝑛: ${configCommand.version || "1.0"}\n` +
+          `│ 𝑅𝑜𝑙𝑒: ${roleText}\n` +
+          `│ 𝑇𝑖𝑚𝑒 𝑃𝑒𝑟 𝐶𝑜𝑚𝑚𝑎𝑛𝑑: ${configCommand.countDown || 1}s\n` +
+          `│ 𝐴𝑢𝑡ℎ𝑜𝑟: ${author}\n` +
+          `├── 𝑼𝑺𝑨𝑮𝑬\n` +
+          `│ ${usage}\n` +
+          `├── 𝑵𝑶𝑻𝑬𝑺\n` +
+          `│ 𝑇ℎ𝑒 𝑐𝑜𝑛𝑡𝑒𝑛𝑡 𝑖𝑛𝑠𝑖𝑑𝑒 𝙼𝙸𝙽𝙰𝚃𝙾 𝚅𝟹 𝑐𝑎𝑛 𝑏𝑒 𝑐ℎ𝑎𝑛𝑔𝑒𝑑\n` +
+          `│ ♕︎ 𝐎𝐖𝐍𝐄𝐑 ♕︎:☠︎︎ 𝙼𝙸𝙽𝙰𝚃𝙾 𝚅𝟹 ☠︎︎\n` +
+          `╰━━━━━━━❖`;
 
-    await message.reply(confirmMessage, async (err, info) => {
-      formSet.messageID = info.messageID;
-      global.GoatBot.onReaction.set(info.messageID, formSet);
-      
-      if (confirmImage) {
-        await sendImage(api, event, confirmImage);
-      }
-    });
-  },
-
-  onReaction: async function ({ message, threadsData, event, Reaction, getLang, api, usersData }) {
-    const { author, newPrefix, setGlobal, threadID } = Reaction;
-    if (event.userID !== author) return;
-    
-    const oldPrefix = setGlobal ? 
-      global.GoatBot.config.prefix : 
-      (await threadsData.get(threadID, "data.prefix")) || global.GoatBot.config.prefix;
-
-    if (setGlobal) {
-      global.GoatBot.config.prefix = newPrefix;
-      fs.writeFileSync(global.client.dirConfig, JSON.stringify(global.GoatBot.config, null, 2));
-      
-      const successImage = await createPrefixImage('changed', {
-        newPrefix: newPrefix,
-        oldPrefix: oldPrefix,
-        isGlobal: true,
-        type: 'Changement Global'
-      }, usersData);
-      
-      await message.reply(getLang("successGlobal", newPrefix));
-      
-      if (successImage) {
-        await sendImage(api, event, successImage);
-      }
-    } else {
-      await threadsData.set(threadID, newPrefix, "data.prefix");
-      
-      const successImage = await createPrefixImage('changed', {
-        newPrefix: newPrefix,
-        oldPrefix: oldPrefix,
-        isGlobal: false,
-        type: 'Changement Box'
-      }, usersData);
-      
-      await message.reply(getLang("successThisThread", newPrefix));
-      
-      if (successImage) {
-        await sendImage(api, event, successImage);
+        await message.reply(response);
       }
     }
   },
-
-  onChat: async function ({ event, message, getLang, api, usersData }) {
-    if (event.body && event.body.toLowerCase() === "prefix") {
-      const globalPrefix = global.GoatBot.config.prefix;
-      const boxPrefix = utils.getPrefix(event.threadID);
-      
-      const infoImage = await createPrefixImage('info', {
-        globalPrefix: globalPrefix,
-        boxPrefix: boxPrefix
-      }, usersData);
-      
-      await message.reply(getLang("myPrefix", globalPrefix, boxPrefix));
-      
-      if (infoImage) {
-        await sendImage(api, event, infoImage);
-      }
-    }
-  }
 };
+
+function roleTextToString(roleText) {
+  switch (roleText) {
+    case 0:
+      return "0 (All users)";
+    case 1:
+      return "1 (Group administrators)";
+    case 2:
+      return "2 (Admin bot)";
+    default:
+      return "Unknown role";
+  }
+}
